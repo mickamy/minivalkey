@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
@@ -20,26 +22,43 @@ func (s *Server) cmdHello(cmd resp.Command, args resp.Args, w *resp.Writer) erro
 	}
 	// Build RESP2-style map as alternating key/value array:
 	// ["server","valkey","version","0.0.0","proto",2,"id",1,"mode","standalone","role","master","modules",[]]
-	ops := []func() error{
-		func() error { return w.WriteArrayHeader(14) },
-		func() error { return w.WriteBulkElem([]byte("server")) },
-		func() error { return w.WriteBulkElem([]byte("valkey")) },
-		func() error { return w.WriteBulkElem([]byte("version")) },
-		func() error { return w.WriteBulkElem([]byte("0.0.0")) },
-		func() error { return w.WriteBulkElem([]byte("proto")) },
-		func() error { return w.WriteIntElem(2) },
-		func() error { return w.WriteBulkElem([]byte("id")) },
-		func() error { return w.WriteIntElem(1) },
-		func() error { return w.WriteBulkElem([]byte("mode")) },
-		func() error { return w.WriteBulkElem([]byte("standalone")) },
-		func() error { return w.WriteBulkElem([]byte("role")) },
-		func() error { return w.WriteBulkElem([]byte("master")) },
-		func() error { return w.WriteBulkElem([]byte("modules")) },
-		func() error { return w.WriteEmptyArray() },
+	if err := w.WriteArrayHeader(14); err != nil {
+		return err
 	}
-	for _, op := range ops {
-		if err := op(); err != nil {
+
+	type emptyArray struct{}
+	fields := []struct {
+		key   string
+		value any
+	}{
+		{"server", "valkey"},
+		{"version", "0.0.0"},
+		{"proto", int64(2)},
+		{"id", int64(1)},
+		{"mode", "standalone"},
+		{"role", "master"},
+		{"modules", emptyArray{}},
+	}
+
+	for _, field := range fields {
+		if err := w.WriteBulkElem([]byte(field.key)); err != nil {
 			return err
+		}
+		switch v := field.value.(type) {
+		case string:
+			if err := w.WriteBulkElem([]byte(v)); err != nil {
+				return err
+			}
+		case int64:
+			if err := w.WriteIntElem(v); err != nil {
+				return err
+			}
+		case emptyArray:
+			if err := w.WriteEmptyArray(); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupported HELLO field type %T", v)
 		}
 	}
 
