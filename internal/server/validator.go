@@ -35,15 +35,6 @@ func validateArgCountAtMost(max int) cmdValidator {
 	}
 }
 
-func validateArgCountRange(min, max int) cmdValidator {
-	return func(cmd resp.Command, args resp.Args) error {
-		if len(args) < min || len(args) > max {
-			return errors.New(resp.WrongNumberOfArgsError(cmd))
-		}
-		return nil
-	}
-}
-
 func (s *Server) validateCommand(cmd resp.Command, args resp.Args, validators ...cmdValidator) error {
 	for _, v := range validators {
 		if err := v(cmd, args); err != nil {
