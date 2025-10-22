@@ -4,15 +4,9 @@ import (
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
-func (s *Server) cmdTTL(cmd resp.Cmd, args resp.Args, w *resp.Writer) error {
-	if len(args) != 2 {
-		if err := w.WriteError("ERR wrong number of arguments for 'TTL'"); err != nil {
-			return err
-		}
-		if err := w.Flush(); err != nil {
-			return err
-		}
-		return nil
+func (s *Server) cmdTTL(cmd resp.Command, args resp.Args, w *resp.Writer) error {
+	if err := s.validateCommand(cmd, args, validateArgCountExact(2)); err != nil {
+		return w.WriteErrorAndFlush(err)
 	}
 	key := string(args[1])
 	ttl := s.store.TTL(s.Now(), key)

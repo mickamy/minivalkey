@@ -10,7 +10,11 @@ import (
 	"github.com/mickamy/minivalkey/internal/store"
 )
 
-func (s *Server) cmdInfo(cmd resp.Cmd, args resp.Args, w *resp.Writer) error {
+var (
+	ErrInfoUnknownSection = fmt.Errorf("ERR unknown section")
+)
+
+func (s *Server) cmdInfo(cmd resp.Command, args resp.Args, w *resp.Writer) error {
 	// RESP2: INFO [section]
 	// We support sections: "server", "memory", "keyspace", plus "all"/"default".
 	// Unknown sections -> error (to match Redis/Valkey behavior).
@@ -22,13 +26,7 @@ func (s *Server) cmdInfo(cmd resp.Cmd, args resp.Args, w *resp.Writer) error {
 	now := s.Now()
 	txt, ok := buildInfo(section, now, s.store, s.uptimeSeconds(now))
 	if !ok {
-		if err := w.WriteError("ERR unknown section"); err != nil {
-			return err
-		}
-		if err := w.Flush(); err != nil {
-			return err
-		}
-		return nil
+		return w.WriteErrorAndFlush(ErrInfoUnknownSection)
 	}
 	if err := w.WriteBulk([]byte(txt)); err != nil {
 		return err

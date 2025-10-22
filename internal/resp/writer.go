@@ -26,10 +26,22 @@ func (w *Writer) WriteString(s string) error {
 	return err
 }
 
-// WriteError writes a RESP2 error ("-...").
-func (w *Writer) WriteError(msg string) error {
+// WriteErrorString writes a RESP2 error ("-...").
+func (w *Writer) WriteErrorString(msg string) error {
 	_, err := w.w.WriteString("-" + msg + "\r\n")
 	return err
+}
+
+// WriteError writes a RESP2 error ("-...").
+func (w *Writer) WriteError(err error) error {
+	return w.WriteErrorString(err.Error())
+}
+
+func (w *Writer) WriteErrorAndFlush(err error) error {
+	if err := w.WriteError(err); err != nil {
+		return err
+	}
+	return w.Flush()
 }
 
 // WriteInt writes a RESP2 integer (":...").

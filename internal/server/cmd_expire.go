@@ -1,29 +1,23 @@
 package server
 
 import (
+	"errors"
+
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
-func (s *Server) cmdExpire(cmd resp.Cmd, args resp.Args, w *resp.Writer) error {
-	if len(args) != 3 {
-		if err := w.WriteError("ERR wrong number of arguments for 'EXPIRE'"); err != nil {
-			return err
-		}
-		if err := w.Flush(); err != nil {
-			return err
-		}
-		return nil
+var (
+	ErrExpireValueNotInteger = errors.New("ERR value is not an integer or out of range")
+)
+
+func (s *Server) cmdExpire(cmd resp.Command, args resp.Args, w *resp.Writer) error {
+	if err := s.validateCommand(cmd, args, validateArgCountExact(3)); err != nil {
+		return w.WriteErrorAndFlush(err)
 	}
 	key := string(args[1])
 	sec, ok := parseInt(args[2])
 	if !ok {
-		if err := w.WriteError("ERR value is not an integer or out of range"); err != nil {
-			return err
-		}
-		if err := w.Flush(); err != nil {
-			return err
-		}
-		return nil
+		return w.WriteErrorAndFlush(ErrExpireValueNotInteger)
 	}
 	if s.store.Expire(s.Now(), key, sec) {
 		if err := w.WriteInt(1); err != nil {
