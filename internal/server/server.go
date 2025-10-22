@@ -109,12 +109,8 @@ func (s *Server) handleConn(c net.Conn) {
 			return
 		}
 		if len(args) == 0 || args[0] == nil {
-			if err := w.WriteError(ErrEmptyCommand); err != nil {
-				logger.Error("failed to write error", "err", err)
-				return
-			}
-			if err := w.Flush(); err != nil {
-				logger.Error("failed to flush writer", "err", err)
+			if err := w.WriteErrorAndFlush(ErrEmptyCommand); err != nil {
+				logger.Error("failed to write and flush error", "err", err)
 				return
 			}
 			continue
@@ -125,12 +121,8 @@ func (s *Server) handleConn(c net.Conn) {
 		if !ok {
 			logger.Warn("unknown command", "cmd", cmd)
 
-			if err := w.WriteErrorString(resp.UnknownCommandError(cmd, args)); err != nil {
-				logger.Error("failed to write error", "err", err)
-				return
-			}
-			if err := w.Flush(); err != nil {
-				logger.Error("failed to flush writer", "err", err)
+			if err := w.WriteErrorAndFlush(errors.New(resp.UnknownCommandError(cmd, args))); err != nil {
+				logger.Error("failed to write and flush error", "err", err)
 				return
 			}
 			continue

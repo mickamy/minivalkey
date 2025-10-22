@@ -26,13 +26,7 @@ func (s *Server) cmdInfo(cmd resp.Command, args resp.Args, w *resp.Writer) error
 	now := s.Now()
 	txt, ok := buildInfo(section, now, s.store, s.uptimeSeconds(now))
 	if !ok {
-		if err := w.WriteError(ErrInfoUnknownSection); err != nil {
-			return err
-		}
-		if err := w.Flush(); err != nil {
-			return err
-		}
-		return nil
+		return w.WriteErrorAndFlush(ErrInfoUnknownSection)
 	}
 	if err := w.WriteBulk([]byte(txt)); err != nil {
 		return err

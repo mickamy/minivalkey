@@ -6,10 +6,7 @@ import (
 
 func (s *Server) cmdDel(cmd resp.Command, args resp.Args, w *resp.Writer) error {
 	if err := s.validateCommand(cmd, args, validateArgCountAtLeast(2)); err != nil {
-		if err := w.WriteError(err); err != nil {
-			return err
-		}
-		return w.Flush()
+		return w.WriteErrorAndFlush(err)
 	}
 	keys := make([]string, 0, len(args)-1)
 	for _, a := range args[1:] {

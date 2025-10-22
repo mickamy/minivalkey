@@ -12,10 +12,7 @@ var (
 
 func (s *Server) cmdExpire(cmd resp.Command, args resp.Args, w *resp.Writer) error {
 	if err := s.validateCommand(cmd, args, validateArgCountExact(3)); err != nil {
-		if err := w.WriteError(err); err != nil {
-			return err
-		}
-		return w.Flush()
+		return w.WriteErrorAndFlush(err)
 	}
 	key := string(args[1])
 	sec, ok := parseInt(args[2])

@@ -6,10 +6,7 @@ import (
 
 func (s *Server) cmdTTL(cmd resp.Command, args resp.Args, w *resp.Writer) error {
 	if err := s.validateCommand(cmd, args, validateArgCountExact(2)); err != nil {
-		if err := w.WriteError(err); err != nil {
-			return err
-		}
-		return w.Flush()
+		return w.WriteErrorAndFlush(err)
 	}
 	key := string(args[1])
 	ttl := s.store.TTL(s.Now(), key)

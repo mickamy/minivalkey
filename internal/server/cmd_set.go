@@ -8,10 +8,7 @@ import (
 
 func (s *Server) cmdSet(cmd resp.Command, args resp.Args, w *resp.Writer) error {
 	if err := s.validateCommand(cmd, args, validateArgCountAtLeast(3)); err != nil {
-		if err := w.WriteError(err); err != nil {
-			return err
-		}
-		return w.Flush()
+		return w.WriteErrorAndFlush(err)
 	}
 
 	key := string(args[1])

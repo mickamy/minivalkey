@@ -37,6 +37,13 @@ func (w *Writer) WriteError(err error) error {
 	return w.WriteErrorString(err.Error())
 }
 
+func (w *Writer) WriteErrorAndFlush(err error) error {
+	if err := w.WriteError(err); err != nil {
+		return err
+	}
+	return w.Flush()
+}
+
 // WriteInt writes a RESP2 integer (":...").
 func (w *Writer) WriteInt(n int64) error {
 	_, err := w.w.WriteString(":" + strconv.FormatInt(n, 10) + "\r\n")
