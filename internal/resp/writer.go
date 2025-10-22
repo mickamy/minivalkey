@@ -34,8 +34,7 @@ func (w *Writer) WriteErrorString(msg string) error {
 
 // WriteError writes a RESP2 error ("-...").
 func (w *Writer) WriteError(err error) error {
-	_, writeErr := w.w.WriteString("-" + err.Error() + "\r\n")
-	return writeErr
+	return w.WriteErrorString(err.Error())
 }
 
 // WriteInt writes a RESP2 integer (":...").
