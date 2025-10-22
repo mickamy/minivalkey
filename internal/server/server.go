@@ -86,6 +86,41 @@ func (s *Server) handleConn(c net.Conn) {
 				_ = resp.WriteError(w, "ERR wrong number of arguments for 'PING'")
 			}
 
+		case "HELLO":
+			// Minimal HELLO handler:
+			// - Accepts "HELLO", "HELLO 2", and "HELLO 3".
+			// - Always negotiates RESP2 (proto=2) and returns a map as alternating key/value array.
+			// - Ignores other HELLO options for now (AUTH, SETNAME, etc.).
+			wantProto := 0
+			if len(args) >= 2 {
+				// If arg[1] is a number (e.g., "2" or "3"), accept it but we'll still serve RESP2.
+				if n, ok := parseInt(args[1]); ok {
+					wantProto = int(n) // kept only for debugging; we don't switch to RESP3
+					_ = wantProto
+				}
+				// else: could be keywords like "AUTH", "SETNAME" — ignore for MVP
+			}
+			// Build RESP2-style map as alternating key/value array:
+			// ["server","valkey","version","0.0.0","proto",2,"id",1,"mode","standalone","role","master","modules",[]]
+			if err := resp.WriteArrayHeader(w, 14); err != nil {
+				return
+			}
+			_ = resp.WriteBulkElem(w, []byte("server"))
+			_ = resp.WriteBulkElem(w, []byte("valkey"))
+			_ = resp.WriteBulkElem(w, []byte("version"))
+			_ = resp.WriteBulkElem(w, []byte("0.0.0"))
+			_ = resp.WriteBulkElem(w, []byte("proto"))
+			_ = resp.WriteIntElem(w, 2) // we speak RESP2
+			_ = resp.WriteBulkElem(w, []byte("id"))
+			_ = resp.WriteIntElem(w, 1) // arbitrary positive id
+			_ = resp.WriteBulkElem(w, []byte("mode"))
+			_ = resp.WriteBulkElem(w, []byte("standalone"))
+			_ = resp.WriteBulkElem(w, []byte("role"))
+			_ = resp.WriteBulkElem(w, []byte("master"))
+			_ = resp.WriteBulkElem(w, []byte("modules"))
+			_ = resp.WriteEmptyArray(w) // writes "*0\r\n" and Flushes
+			_ = resp.Flush(w)
+
 		case "SET":
 			if len(args) < 3 {
 				_ = resp.WriteError(w, "ERR wrong number of arguments for 'SET'")

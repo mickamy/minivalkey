@@ -69,10 +69,14 @@ func (s *Server) Close() error {
 // FastForward advances the internal clock by the specified duration.
 // Useful for testing key expiration.
 func (s *Server) FastForward(d time.Duration) {
+	// 1) lock, update offset, compute "now" locally, then unlock
 	s.clockMu.Lock()
-	defer s.clockMu.Unlock()
 	s.offset += d
-	s.store.CleanUpExpired(s.now())
+	now := s.clockBase.Add(s.offset)
+	s.clockMu.Unlock()
+
+	// 2) run expiration cleanup *outside* the clock lock
+	s.store.CleanUpExpired(now)
 }
 
 // now returns the current simulated time.

@@ -51,6 +51,44 @@ func WriteBulk(w *bufio.Writer, b []byte) error {
 	return w.Flush()
 }
 
+func WriteArrayHeader(w *bufio.Writer, n int) error {
+	if _, err := w.WriteString("*" + strconv.Itoa(n) + "\r\n"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func WriteBulkElem(w *bufio.Writer, b []byte) error {
+	if b == nil {
+		if _, err := w.WriteString("$-1\r\n"); err != nil {
+			return err
+		}
+		return nil
+	}
+	if _, err := w.WriteString("$" + strconv.Itoa(len(b)) + "\r\n"); err != nil {
+		return err
+	}
+	if _, err := w.Write(b); err != nil {
+		return err
+	}
+	_, err := w.WriteString("\r\n")
+	return err
+}
+
+func WriteIntElem(w *bufio.Writer, n int64) error {
+	if _, err := w.WriteString(":" + strconv.FormatInt(n, 10) + "\r\n"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func WriteEmptyArray(w *bufio.Writer) error {
+	if _, err := w.WriteString("*0\r\n"); err != nil {
+		return err
+	}
+	return w.Flush()
+}
+
 func WriteNull(w *bufio.Writer) error {
 	// RESP2 Null Bulk String
 	if _, err := w.WriteString("$-1\r\n"); err != nil {
@@ -58,6 +96,8 @@ func WriteNull(w *bufio.Writer) error {
 	}
 	return w.Flush()
 }
+
+func Flush(w *bufio.Writer) error { return w.Flush() }
 
 // ----- Reader (client -> server) for Arrays of Bulk Strings (Commands) -----
 
