@@ -58,6 +58,18 @@ func Run() (*Server, error) {
 // Addr returns the TCP address of the running server.
 func (s *Server) Addr() string { return s.addr }
 
+// Host returns the host part of the server address.
+func (s *Server) Host() string {
+	host, _, _ := net.SplitHostPort(s.addr)
+	return host
+}
+
+// Port returns the port part of the server address.
+func (s *Server) Port() string {
+	_, port, _ := net.SplitHostPort(s.addr)
+	return port
+}
+
 // Close stops the server and releases resources.
 func (s *Server) Close() error {
 	if s.srv != nil {

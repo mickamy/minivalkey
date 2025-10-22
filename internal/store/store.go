@@ -118,6 +118,38 @@ func (st *Store) TTL(now time.Time, k string) int64 {
 	return int64(e.expireAt.Sub(now).Seconds())
 }
 
+// Stats returns simple keyspace stats at "now".
+// keys: total keys
+// expires: number of keys that have expiration set and are not yet expired at "now"
+// avgTTLms: average TTL in milliseconds among keys that have expiration (>0); 0 if none.
+func (st *Store) Stats(now time.Time) (keys int, expires int, avgTTLms int64) {
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+
+	var ttlSum time.Duration
+	var ttlCount int
+
+	for _, e := range st.data {
+		// Skip already expired ones (lazy deletion will remove them later)
+		if !e.expireAt.IsZero() && now.After(e.expireAt) {
+			continue
+		}
+		keys++
+		if !e.expireAt.IsZero() {
+			expires++
+			ttl := e.expireAt.Sub(now)
+			if ttl > 0 {
+				ttlSum += ttl
+				ttlCount++
+			}
+		}
+	}
+	if ttlCount > 0 {
+		avgTTLms = ttlSum.Milliseconds() / int64(ttlCount)
+	}
+	return
+}
+
 // CleanUpExpired scans entire map and removes expired entries.
 // It's fine for test workloads (small maps). No fancy wheels required.
 func (st *Store) CleanUpExpired(now time.Time) {
