@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -98,7 +97,7 @@ func TestTTL_NoExpire_And_NonExisting_WithValkeyGo(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { client.Close() })
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// TTL on non-existing key -> -2
 	ttl := client.Do(ctx, client.B().Ttl().Key("nope").Build())
