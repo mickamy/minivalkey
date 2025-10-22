@@ -17,13 +17,7 @@ func (s *Server) cmdExpire(cmd resp.Command, args resp.Args, w *resp.Writer) err
 	key := string(args[1])
 	sec, ok := parseInt(args[2])
 	if !ok {
-		if err := w.WriteError(ErrExpireValueNotInteger); err != nil {
-			return err
-		}
-		if err := w.Flush(); err != nil {
-			return err
-		}
-		return nil
+		return w.WriteErrorAndFlush(ErrExpireValueNotInteger)
 	}
 	if s.store.Expire(s.Now(), key, sec) {
 		if err := w.WriteInt(1); err != nil {
