@@ -9,25 +9,25 @@ type Arg []byte
 
 type Args []Arg
 
-func (as Args) Cmd() Cmd {
+func (as Args) Cmd() Command {
 	if len(as) == 0 {
 		return ""
 	}
-	return Cmd(strings.ToUpper(string(as[0])))
+	return Command(strings.ToUpper(string(as[0])))
 }
 
-type Cmd string
+type Command string
 
-func (c Cmd) String() string {
+func (c Command) String() string {
 	return string(c)
 }
 
-func (c Cmd) WrongNumberOfArgsError() string {
-	return fmt.Sprintf("ERR wrong number of arguments for '%s' command", strings.ToLower(c.String()))
+func WrongNumberOfArgsError(cmd Command) string {
+	return fmt.Sprintf("ERR wrong number of arguments for '%s' command", strings.ToLower(cmd.String()))
 }
 
-func (c Cmd) UnknownCommandError(args Args) string {
-	s := fmt.Sprintf("ERR unknown command `%s`, with args beginning with: ", c.String())
+func UnknownCommandError(cmd Command, args Args) string {
+	s := fmt.Sprintf("ERR unknown command `%s`, with args beginning with: ", cmd)
 	if len(args) > 20 {
 		args = args[:20]
 	}

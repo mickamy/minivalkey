@@ -12,7 +12,11 @@ import (
 	"github.com/mickamy/minivalkey/internal/store"
 )
 
-type handleFunc func(cmd resp.Cmd, args resp.Args, w *resp.Writer) error
+var (
+	ErrEmptyCommand = errors.New("ERR empty command")
+)
+
+type handleFunc func(cmd resp.Command, args resp.Args, w *resp.Writer) error
 
 // Server wraps a raw TCP listener and processes RESP2 commands.
 // One goroutine per accepted connection; each has its own bufio Reader/Writer.
@@ -104,7 +108,7 @@ func (s *Server) handleConn(c net.Conn) {
 			return
 		}
 		if len(args) == 0 || args[0] == nil {
-			if err := w.WriteError("ERR empty command"); err != nil {
+			if err := w.WriteError(ErrEmptyCommand); err != nil {
 				return
 			}
 			if err := w.Flush(); err != nil {
@@ -116,7 +120,7 @@ func (s *Server) handleConn(c net.Conn) {
 		cmd := args.Cmd()
 		handle, ok := s.cmds[cmd.String()]
 		if !ok {
-			if err := w.WriteError(cmd.UnknownCommandError(args)); err != nil {
+			if err := w.WriteErrorString(resp.UnknownCommandError(cmd, args)); err != nil {
 				return
 			}
 			if err := w.Flush(); err != nil {

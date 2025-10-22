@@ -4,15 +4,12 @@ import (
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
-func (s *Server) cmdDel(cmd resp.Cmd, args resp.Args, w *resp.Writer) error {
-	if len(args) < 2 {
-		if err := w.WriteError("ERR wrong number of arguments for 'DEL'"); err != nil {
+func (s *Server) cmdDel(cmd resp.Command, args resp.Args, w *resp.Writer) error {
+	if err := s.validateCommand(cmd, args, validateArgCountAtLeast(2)); err != nil {
+		if err := w.WriteError(err); err != nil {
 			return err
 		}
-		if err := w.Flush(); err != nil {
-			return err
-		}
-		return nil
+		return w.Flush()
 	}
 	keys := make([]string, 0, len(args)-1)
 	for _, a := range args[1:] {

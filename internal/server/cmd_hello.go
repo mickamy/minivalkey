@@ -4,7 +4,7 @@ import (
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
-func (s *Server) cmdHello(cmd resp.Cmd, args resp.Args, w *resp.Writer) error {
+func (s *Server) cmdHello(cmd resp.Command, args resp.Args, w *resp.Writer) error {
 	// Minimal HELLO handler:
 	// - Accepts "HELLO", "HELLO 2", and "HELLO 3".
 	// - Always negotiates RESP2 (proto=2) and returns a map as alternating key/value array.
