@@ -2,12 +2,14 @@ package server
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mickamy/minivalkey/internal/clock"
 	"github.com/mickamy/minivalkey/internal/resp"
 	"github.com/mickamy/minivalkey/internal/store"
 )
@@ -19,20 +21,26 @@ type Server struct {
 	doneCh   chan struct{}
 
 	store *store.Store
-	now   func() time.Time
-
-	clockBase time.Time
+	clock *clock.Clock
 }
 
-// New wires a Store and clock fn to a net.Listener.
-func New(ln net.Listener, st *store.Store, now func() time.Time) *Server {
-	return &Server{
-		listener:  ln,
-		doneCh:    make(chan struct{}),
-		store:     st,
-		now:       now,
-		clockBase: now(),
+// New wires a Store to a net.Listener and seeds the simulated clock.
+func New(ln net.Listener, st *store.Store, clk *clock.Clock) (*Server, error) {
+	if ln == nil {
+		return nil, errors.New("listener is nil")
 	}
+	if st == nil {
+		return nil, errors.New("store is nil")
+	}
+	if clk == nil {
+		return nil, errors.New("clock is nil")
+	}
+	return &Server{
+		listener: ln,
+		doneCh:   make(chan struct{}),
+		store:    st,
+		clock:    clk,
+	}, nil
 }
 
 // Serve accepts connections and spawns handlers until the listener is closed.
@@ -134,7 +142,7 @@ func (s *Server) handleConn(c net.Conn) {
 				section = strings.ToLower(string(args[1]))
 			}
 			// Build content based on requested section.
-			now := s.now()
+			now := s.Now()
 			txt, ok := buildInfo(section, now, s.store, s.uptimeSeconds(now))
 			if !ok {
 				_ = resp.WriteError(w, "ERR unknown section")
@@ -160,7 +168,7 @@ func (s *Server) handleConn(c net.Conn) {
 				continue
 			}
 			key := string(args[1])
-			if v, ok := s.store.GetString(s.now(), key); ok {
+			if v, ok := s.store.GetString(s.Now(), key); ok {
 				_ = resp.WriteBulk(w, []byte(v))
 			} else {
 				_ = resp.WriteNull(w)
@@ -189,7 +197,7 @@ func (s *Server) handleConn(c net.Conn) {
 				_ = resp.WriteError(w, "ERR value is not an integer or out of range")
 				continue
 			}
-			if s.store.Expire(s.now(), key, sec) {
+			if s.store.Expire(s.Now(), key, sec) {
 				_ = resp.WriteInt(w, 1)
 			} else {
 				_ = resp.WriteInt(w, 0)
@@ -201,7 +209,7 @@ func (s *Server) handleConn(c net.Conn) {
 				continue
 			}
 			key := string(args[1])
-			ttl := s.store.TTL(s.now(), key)
+			ttl := s.store.TTL(s.Now(), key)
 			_ = resp.WriteInt(w, ttl)
 
 		default:
@@ -212,8 +220,17 @@ func (s *Server) handleConn(c net.Conn) {
 
 // uptimeSeconds returns server uptime in seconds based on the simulated clock.
 func (s *Server) uptimeSeconds(now time.Time) int64 {
-	// "now" is computed from clockBase + offset already in the caller.
-	return int64(now.Sub(s.clockBase).Seconds())
+	return int64(now.Sub(s.clock.Base()).Seconds())
+}
+
+// Now returns the current simulated time for the server.
+func (s *Server) Now() time.Time {
+	return s.clock.Now()
+}
+
+// AdvanceClock moves the simulated clock forward and returns the updated time.
+func (s *Server) AdvanceClock(d time.Duration) time.Time {
+	return s.clock.Advance(d)
 }
 
 func parseInt(b []byte) (int64, bool) {
