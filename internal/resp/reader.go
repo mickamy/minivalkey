@@ -25,7 +25,7 @@ func NewReader(r *bufio.Reader) *Reader {
 
 // ReadArrayBulk reads a RESP2 array of bulk strings.
 // e.g. *3\r\n$3\r\nSET\r\n$1\r\na\r\n$1\r\nb\r\n
-func (r *Reader) ReadArrayBulk() ([][]byte, error) {
+func (r *Reader) ReadArrayBulk() (Args, error) {
 	prefix, err := r.r.ReadByte()
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func (r *Reader) ReadArrayBulk() ([][]byte, error) {
 	if n < 0 {
 		return nil, ErrProtocol
 	}
-	out := make([][]byte, 0, n)
+	out := make(Args, 0, n)
 	for i := 0; i < n; i++ {
 		pfx, err := r.r.ReadByte()
 		if err != nil {
