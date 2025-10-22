@@ -22,7 +22,8 @@ func handler() *slog.TextHandler {
 }
 
 func handle(level slog.Level, msg string, args ...any) {
-	_, f, l, _ := runtime.Caller(2)
+	stepsToSkip := 2 // handle -> Debug/Info/Warn/Error -> caller
+	_, f, l, _ := runtime.Caller(stepsToSkip)
 	source := fmt.Sprintf("%s:%d", f, l)
 	args = append(args, slog.String("source", source))
 
