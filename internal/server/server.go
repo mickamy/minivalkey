@@ -6,7 +6,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/resp"
@@ -22,18 +21,17 @@ type Server struct {
 	store *store.Store
 	now   func() time.Time
 
-	clockMu   sync.RWMutex
 	clockBase time.Time
-	offset    time.Duration
 }
 
 // New wires a Store and clock fn to a net.Listener.
 func New(ln net.Listener, st *store.Store, now func() time.Time) *Server {
 	return &Server{
-		listener: ln,
-		doneCh:   make(chan struct{}),
-		store:    st,
-		now:      now,
+		listener:  ln,
+		doneCh:    make(chan struct{}),
+		store:     st,
+		now:       now,
+		clockBase: now(),
 	}
 }
 
