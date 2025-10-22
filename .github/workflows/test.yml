@@ -1,8 +1,10 @@
 name: Run Lint and Test
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ "*" ]
+    branches:
+      - '**'
 
 jobs:
   lint-and-test:
