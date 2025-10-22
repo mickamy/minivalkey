@@ -50,23 +50,19 @@ func New(ln net.Listener, st *store.Store, clk *clock.Clock) (*Server, error) {
 		cmds:     make(map[string]handleFunc),
 	}
 
-	cmds := []map[string]handleFunc{
-		{
-			"DEL":    s.cmdDel,
-			"EXPIRE": s.cmdExpire,
-			"GET":    s.cmdGet,
-			"HELLO":  s.cmdHello,
-			"INFO":   s.cmdInfo,
-			"PING":   s.cmdPing,
-			"SET":    s.cmdSet,
-			"TTL":    s.cmdTTL,
-		},
+	handlers := map[string]handleFunc{
+		"DEL":    s.cmdDel,
+		"EXPIRE": s.cmdExpire,
+		"GET":    s.cmdGet,
+		"HELLO":  s.cmdHello,
+		"INFO":   s.cmdInfo,
+		"PING":   s.cmdPing,
+		"SET":    s.cmdSet,
+		"TTL":    s.cmdTTL,
 	}
-	for _, cmdMap := range cmds {
-		for name, handle := range cmdMap {
-			if err := s.register(name, handle); err != nil {
-				return nil, err
-			}
+	for cmd, handler := range handlers {
+		if err := s.register(cmd, handler); err != nil {
+			return nil, fmt.Errorf("failed to register command %s: %w", cmd, err)
 		}
 	}
 
