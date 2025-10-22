@@ -74,12 +74,6 @@ func (s *Server) handleConn(c net.Conn) {
 
 	r := resp.NewReader(bufio.NewReader(c))
 	w := resp.NewWriter(bufio.NewWriter(c))
-	write := func(err error) bool {
-		return err == nil
-	}
-	flush := func() bool {
-		return write(w.Flush())
-	}
 
 	for {
 		args, err := r.ReadArrayBulk()
@@ -88,10 +82,10 @@ func (s *Server) handleConn(c net.Conn) {
 			return
 		}
 		if len(args) == 0 || args[0] == nil {
-			if !write(w.WriteError("ERR empty command")) {
+			if err := w.WriteError("ERR empty command"); err != nil {
 				return
 			}
-			if !flush() {
+			if err := w.Flush(); err != nil {
 				return
 			}
 			continue
@@ -139,7 +133,7 @@ func (s *Server) handleConn(c net.Conn) {
 				func() error { return w.WriteEmptyArray() },
 			}
 			for _, op := range ops {
-				if !write(op()) {
+				if err := op(); err != nil {
 					return
 				}
 			}
@@ -156,24 +150,24 @@ func (s *Server) handleConn(c net.Conn) {
 			now := s.Now()
 			txt, ok := buildInfo(section, now, s.store, s.uptimeSeconds(now))
 			if !ok {
-				if !write(w.WriteError("ERR unknown section")) {
+				if err := w.WriteError("ERR unknown section"); err != nil {
 					return
 				}
-				if !flush() {
+				if err := w.Flush(); err != nil {
 					return
 				}
 				continue
 			}
-			if !write(w.WriteBulk([]byte(txt))) {
+			if err := w.WriteBulk([]byte(txt)); err != nil {
 				return
 			}
 
 		case "SET":
 			if len(args) < 3 {
-				if !write(w.WriteError("ERR wrong number of arguments for 'SET'")) {
+				if err := w.WriteError("ERR wrong number of arguments for 'SET'"); err != nil {
 					return
 				}
-				if !flush() {
+				if err := w.Flush(); err != nil {
 					return
 				}
 				continue
@@ -183,37 +177,37 @@ func (s *Server) handleConn(c net.Conn) {
 
 			// MVP: ignore EX/PX/NX/XX/KEEPTTL options for now.
 			s.store.SetString(key, val, time.Time{})
-			if !write(w.WriteString("OK")) {
+			if err := w.WriteString("OK"); err != nil {
 				return
 			}
 
 		case "GET":
 			if len(args) != 2 {
-				if !write(w.WriteError("ERR wrong number of arguments for 'GET'")) {
+				if err := w.WriteError("ERR wrong number of arguments for 'GET'"); err != nil {
 					return
 				}
-				if !flush() {
+				if err := w.Flush(); err != nil {
 					return
 				}
 				continue
 			}
 			key := string(args[1])
 			if v, ok := s.store.GetString(s.Now(), key); ok {
-				if !write(w.WriteBulk([]byte(v))) {
+				if err := w.WriteBulk([]byte(v)); err != nil {
 					return
 				}
 			} else {
-				if !write(w.WriteNull()) {
+				if err := w.WriteNull(); err != nil {
 					return
 				}
 			}
 
 		case "DEL":
 			if len(args) < 2 {
-				if !write(w.WriteError("ERR wrong number of arguments for 'DEL'")) {
+				if err := w.WriteError("ERR wrong number of arguments for 'DEL'"); err != nil {
 					return
 				}
-				if !flush() {
+				if err := w.Flush(); err != nil {
 					return
 				}
 				continue
@@ -223,16 +217,16 @@ func (s *Server) handleConn(c net.Conn) {
 				keys = append(keys, string(a))
 			}
 			n := s.store.Del(keys...)
-			if !write(w.WriteInt(int64(n))) {
+			if err := w.WriteInt(int64(n)); err != nil {
 				return
 			}
 
 		case "EXPIRE":
 			if len(args) != 3 {
-				if !write(w.WriteError("ERR wrong number of arguments for 'EXPIRE'")) {
+				if err := w.WriteError("ERR wrong number of arguments for 'EXPIRE'"); err != nil {
 					return
 				}
-				if !flush() {
+				if err := w.Flush(); err != nil {
 					return
 				}
 				continue
@@ -240,47 +234,47 @@ func (s *Server) handleConn(c net.Conn) {
 			key := string(args[1])
 			sec, ok := parseInt(args[2])
 			if !ok {
-				if !write(w.WriteError("ERR value is not an integer or out of range")) {
+				if err := w.WriteError("ERR value is not an integer or out of range"); err != nil {
 					return
 				}
-				if !flush() {
+				if err := w.Flush(); err != nil {
 					return
 				}
 				continue
 			}
 			if s.store.Expire(s.Now(), key, sec) {
-				if !write(w.WriteInt(1)) {
+				if err := w.WriteInt(1); err != nil {
 					return
 				}
 			} else {
-				if !write(w.WriteInt(0)) {
+				if err := w.WriteInt(0); err != nil {
 					return
 				}
 			}
 
 		case "TTL":
 			if len(args) != 2 {
-				if !write(w.WriteError("ERR wrong number of arguments for 'TTL'")) {
+				if err := w.WriteError("ERR wrong number of arguments for 'TTL'"); err != nil {
 					return
 				}
-				if !flush() {
+				if err := w.Flush(); err != nil {
 					return
 				}
 				continue
 			}
 			key := string(args[1])
 			ttl := s.store.TTL(s.Now(), key)
-			if !write(w.WriteInt(ttl)) {
+			if err := w.WriteInt(ttl); err != nil {
 				return
 			}
 
 		default:
-			if !write(w.WriteError(cmd.UnknownCommandError(args))) {
+			if err := w.WriteError(cmd.UnknownCommandError(args)); err != nil {
 				return
 			}
 		}
 
-		if !flush() {
+		if err := w.Flush(); err != nil {
 			return
 		}
 	}
