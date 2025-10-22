@@ -91,7 +91,7 @@ func (s *Server) handleConn(c net.Conn) {
 		case "PING":
 			switch len(args) {
 			case 1:
-				_ = resp.WriteSimpleString(w, "PONG")
+				_ = resp.WriteString(w, "PONG")
 			case 2:
 				_ = resp.WriteBulk(w, args[1])
 			default:
@@ -160,7 +160,7 @@ func (s *Server) handleConn(c net.Conn) {
 
 			// MVP: ignore EX/PX/NX/XX/KEEPTTL options for now.
 			s.store.SetString(key, val, time.Time{})
-			_ = resp.WriteSimpleString(w, "OK")
+			_ = resp.WriteString(w, "OK")
 
 		case "GET":
 			if len(args) != 2 {

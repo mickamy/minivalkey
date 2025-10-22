@@ -10,7 +10,7 @@ import (
 
 // ------ Writer (server -> client) for RESP2 types ------
 
-func WriteSimpleString(w *bufio.Writer, s string) error {
+func WriteString(w *bufio.Writer, s string) error {
 	if _, err := w.WriteString("+" + s + "\r\n"); err != nil {
 		return err
 	}
