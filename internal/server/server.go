@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/mickamy/minivalkey/internal/resp"
 	"github.com/mickamy/minivalkey/internal/store"
 )
+
+type handleFunc func(cmd resp.Cmd, args resp.Args, w *resp.Writer) error
 
 // Server wraps a raw TCP listener and processes RESP2 commands.
 // One goroutine per accepted connection; each has its own bufio Reader/Writer.
@@ -19,6 +22,8 @@ type Server struct {
 
 	store *store.Store
 	clock *clock.Clock
+
+	cmds map[string]handleFunc
 }
 
 // New wires a Store to a net.Listener and seeds the simulated clock.
@@ -32,12 +37,35 @@ func New(ln net.Listener, st *store.Store, clk *clock.Clock) (*Server, error) {
 	if clk == nil {
 		return nil, errors.New("clock is nil")
 	}
-	return &Server{
+	s := &Server{
 		listener: ln,
 		doneCh:   make(chan struct{}),
 		store:    st,
 		clock:    clk,
-	}, nil
+		cmds:     make(map[string]handleFunc),
+	}
+
+	cmds := []map[string]handleFunc{
+		{
+			"DEL":    s.cmdDel,
+			"EXPIRE": s.cmdExpire,
+			"GET":    s.cmdGet,
+			"HELLO":  s.cmdHello,
+			"INFO":   s.cmdInfo,
+			"PING":   s.cmdPing,
+			"SET":    s.cmdSet,
+			"TTL":    s.cmdTTL,
+		},
+	}
+	for _, cmdMap := range cmds {
+		for name, handle := range cmdMap {
+			if err := s.register(name, handle); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return s, nil
 }
 
 // Serve accepts connections and spawns handlers until the listener is closed.
@@ -58,10 +86,7 @@ func (s *Server) Done() <-chan struct{} { return s.doneCh }
 
 // Close stops accepting new connections and closes the listener.
 func (s *Server) Close() error {
-	if s.listener != nil {
-		_ = s.listener.Close()
-	}
-	return nil
+	return s.listener.Close()
 }
 
 func (s *Server) handleConn(c net.Conn) {
@@ -89,58 +114,32 @@ func (s *Server) handleConn(c net.Conn) {
 		}
 
 		cmd := args.Cmd()
-
-		switch cmd {
-		case "PING":
-			if err := s.cmdPing(cmd, args, w); err != nil {
-				return
-			}
-
-		case "HELLO":
-			if err := s.cmdHello(cmd, args, w); err != nil {
-				return
-			}
-
-		case "INFO":
-			if err := s.cmdInfo(cmd, args, w); err != nil {
-				return
-			}
-
-		case "SET":
-			if err := s.cmdSet(cmd, args, w); err != nil {
-				return
-			}
-
-		case "GET":
-			if err := s.cmdGet(cmd, args, w); err != nil {
-				return
-			}
-
-		case "DEL":
-			if err := s.cmdDel(cmd, args, w); err != nil {
-				return
-			}
-
-		case "EXPIRE":
-			if err := s.cmdExpire(cmd, args, w); err != nil {
-				return
-			}
-
-		case "TTL":
-			if err := s.cmdTTL(cmd, args, w); err != nil {
-				return
-			}
-
-		default:
+		handle, ok := s.cmds[cmd.String()]
+		if !ok {
 			if err := w.WriteError(cmd.UnknownCommandError(args)); err != nil {
 				return
 			}
+			if err := w.Flush(); err != nil {
+				return
+			}
+			continue
 		}
 
+		if err := handle(cmd, args, w); err != nil {
+			return
+		}
 		if err := w.Flush(); err != nil {
 			return
 		}
 	}
+}
+
+func (s *Server) register(name string, handle handleFunc) error {
+	if _, exists := s.cmds[name]; exists {
+		return fmt.Errorf("command %s already exists", name)
+	}
+	s.cmds[name] = handle
+	return nil
 }
 
 // uptimeSeconds returns server uptime in seconds based on the simulated clock.
