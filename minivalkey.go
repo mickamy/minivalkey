@@ -83,7 +83,7 @@ func (s *MiniValkey) Close() error {
 // FastForward advances the internal clock by the specified duration.
 // Useful for testing key expiration.
 func (s *MiniValkey) FastForward(d time.Duration) {
-	// Advance simulated clock inside the server, then run cleanup outside the lock.
+	// Advance simulated clock inside the server, then run clean-up outside the lock.
 	now := s.srv.AdvanceClock(d)
 	s.store.CleanUpExpired(now)
 }
