@@ -96,23 +96,13 @@ func (s *Server) handleConn(c net.Conn) {
 			}
 			continue
 		}
-		name := strings.ToUpper(string(args[0]))
 
-		switch name {
+		cmd := args.Cmd()
+
+		switch cmd {
 		case "PING":
-			switch len(args) {
-			case 1:
-				if !write(w.WriteString("PONG")) {
-					return
-				}
-			case 2:
-				if !write(w.WriteBulk(args[1])) {
-					return
-				}
-			default:
-				if !write(w.WriteError("ERR wrong number of arguments for 'PING'")) {
-					return
-				}
+			if err := s.cmdPing(cmd, args, w); err != nil {
+				return
 			}
 
 		case "HELLO":
@@ -285,7 +275,7 @@ func (s *Server) handleConn(c net.Conn) {
 			}
 
 		default:
-			if !write(w.WriteError(fmt.Sprintf("ERR unknown command: '%s'", name))) {
+			if !write(w.WriteError(cmd.UnknownCommandError(args))) {
 				return
 			}
 		}
