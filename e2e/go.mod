@@ -1,6 +1,6 @@
 module github.com/mickamy/minivalkey/e2e
 
-go 1.25.3
+go 1.24
 
 replace github.com/mickamy/minivalkey => ../
 
