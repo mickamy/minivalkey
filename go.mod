@@ -1,6 +1,6 @@
 module github.com/mickamy/minivalkey
 
-go 1.25.3
+go 1.23
 
 tool honnef.co/go/tools/cmd/staticcheck
 
