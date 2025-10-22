@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/clock"
+	"github.com/mickamy/minivalkey/internal/logger"
 	"github.com/mickamy/minivalkey/internal/resp"
 	"github.com/mickamy/minivalkey/internal/store"
 )
@@ -109,9 +110,11 @@ func (s *Server) handleConn(c net.Conn) {
 		}
 		if len(args) == 0 || args[0] == nil {
 			if err := w.WriteError(ErrEmptyCommand); err != nil {
+				logger.Error("failed to write error", "err", err)
 				return
 			}
 			if err := w.Flush(); err != nil {
+				logger.Error("failed to flush writer", "err", err)
 				return
 			}
 			continue
@@ -120,19 +123,25 @@ func (s *Server) handleConn(c net.Conn) {
 		cmd := args.Cmd()
 		handle, ok := s.cmds[cmd.String()]
 		if !ok {
+			logger.Warn("unknown command", "cmd", cmd)
+
 			if err := w.WriteErrorString(resp.UnknownCommandError(cmd, args)); err != nil {
+				logger.Error("failed to write error", "err", err)
 				return
 			}
 			if err := w.Flush(); err != nil {
+				logger.Error("failed to flush writer", "err", err)
 				return
 			}
 			continue
 		}
 
 		if err := handle(cmd, args, w); err != nil {
+			logger.Error("command handler error", "cmd", cmd.String(), "err", err)
 			return
 		}
 		if err := w.Flush(); err != nil {
+			logger.Error("failed to flush writer", "err", err)
 			return
 		}
 	}
