@@ -116,7 +116,7 @@ func TestTTL_NoExpire_And_NonExisting_WithValkeyGo(t *testing.T) {
 	assert.Equal(t, int64(-1), n)
 }
 
-func newValkeyClient(t *testing.T, s *minivalkey.Server) valkey.Client {
+func newValkeyClient(t *testing.T, s *minivalkey.MiniValkey) valkey.Client {
 	t.Helper()
 	client, err := valkey.NewClient(valkey.ClientOption{
 		InitAddress:           []string{s.Addr()},

@@ -9,9 +9,9 @@ import (
 	"github.com/mickamy/minivalkey/internal/store"
 )
 
-// Server represents an in-memory Valkey-compatible server instance.
+// MiniValkey represents an in-memory Valkey-compatible server instance.
 // It provides APIs for starting, stopping, and manipulating simulated time.
-type Server struct {
+type MiniValkey struct {
 	addr      string
 	srv       *server.Server
 	store     *store.Store
@@ -21,9 +21,9 @@ type Server struct {
 }
 
 // Run starts a new in-memory Valkey server listening on an ephemeral port.
-func Run() (*Server, error) {
+func Run() (*MiniValkey, error) {
 	st := store.New()
-	s := &Server{
+	s := &MiniValkey{
 		store:     st,
 		clockBase: time.Now(),
 	}
@@ -56,22 +56,22 @@ func Run() (*Server, error) {
 }
 
 // Addr returns the TCP address of the running server.
-func (s *Server) Addr() string { return s.addr }
+func (s *MiniValkey) Addr() string { return s.addr }
 
 // Host returns the host part of the server address.
-func (s *Server) Host() string {
+func (s *MiniValkey) Host() string {
 	host, _, _ := net.SplitHostPort(s.addr)
 	return host
 }
 
 // Port returns the port part of the server address.
-func (s *Server) Port() string {
+func (s *MiniValkey) Port() string {
 	_, port, _ := net.SplitHostPort(s.addr)
 	return port
 }
 
 // Close stops the server and releases resources.
-func (s *Server) Close() error {
+func (s *MiniValkey) Close() error {
 	if s.srv != nil {
 		return s.srv.Close()
 	}
@@ -80,7 +80,7 @@ func (s *Server) Close() error {
 
 // FastForward advances the internal clock by the specified duration.
 // Useful for testing key expiration.
-func (s *Server) FastForward(d time.Duration) {
+func (s *MiniValkey) FastForward(d time.Duration) {
 	// 1) lock, update offset, compute "now" locally, then unlock
 	s.clockMu.Lock()
 	s.offset += d
@@ -92,7 +92,7 @@ func (s *Server) FastForward(d time.Duration) {
 }
 
 // now returns the current simulated time.
-func (s *Server) now() time.Time {
+func (s *MiniValkey) now() time.Time {
 	s.clockMu.RLock()
 	defer s.clockMu.RUnlock()
 	return s.clockBase.Add(s.offset)
