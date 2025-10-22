@@ -94,24 +94,6 @@ go test ./...
 
 ---
 
-## Design Overview
-
-```mermaid
-flowchart TD
-    subgraph Server
-        A[listener: TCP] --> B[Session handler]
-        B --> C[Command dispatcher]
-        C --> D[Store]
-    end
-    D -->|in-memory map| E[(key -> entry{value, expireAt})]
-```
-
-* `internal/resp` — minimal RESP2 encoder/decoder
-* `internal/store` — typed in-memory storage and TTL management
-* `internal/server` — network listener and command handlers
-
----
-
 ## Go Compatibility
 
 * **Minimum:** Go 1.24
