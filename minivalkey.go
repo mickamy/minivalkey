@@ -2,9 +2,9 @@ package minivalkey
 
 import (
 	"net"
-	"sync"
 	"time"
 
+	"github.com/mickamy/minivalkey/internal/clock"
 	"github.com/mickamy/minivalkey/internal/server"
 	"github.com/mickamy/minivalkey/internal/store"
 )
@@ -12,21 +12,18 @@ import (
 // MiniValkey represents an in-memory Valkey-compatible server instance.
 // It provides APIs for starting, stopping, and manipulating simulated time.
 type MiniValkey struct {
-	addr      string
-	srv       *server.Server
-	store     *store.Store
-	clockMu   sync.RWMutex
-	clockBase time.Time
-	offset    time.Duration
+	addr  string
+	srv   *server.Server
+	store *store.Store
 }
 
 // Run starts a new in-memory Valkey server listening on an ephemeral port.
 func Run() (*MiniValkey, error) {
 	st := store.New()
 	s := &MiniValkey{
-		store:     st,
-		clockBase: time.Now(),
+		store: st,
 	}
+	clk := clock.New(time.Now())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -35,10 +32,15 @@ func Run() (*MiniValkey, error) {
 	s.addr = ln.Addr().String()
 
 	// Start TCP server
-	s.srv = server.New(ln, st, s.now)
+	s.srv, err = server.New(ln, st, clk)
+	if err != nil {
+		_ = ln.Close()
+		return nil, err
+	}
+
 	go s.srv.Serve()
 
-	// Background cleanup for expired keys
+	// Background clean-up for expired keys
 	go func() {
 		ticker := time.NewTicker(200 * time.Millisecond)
 		defer ticker.Stop()
@@ -47,7 +49,7 @@ func Run() (*MiniValkey, error) {
 			case <-s.srv.Done():
 				return
 			case <-ticker.C:
-				st.CleanUpExpired(s.now())
+				st.CleanUpExpired(s.srv.Now())
 			}
 		}
 	}()
@@ -81,19 +83,7 @@ func (s *MiniValkey) Close() error {
 // FastForward advances the internal clock by the specified duration.
 // Useful for testing key expiration.
 func (s *MiniValkey) FastForward(d time.Duration) {
-	// 1) lock, update offset, compute "now" locally, then unlock
-	s.clockMu.Lock()
-	s.offset += d
-	now := s.clockBase.Add(s.offset)
-	s.clockMu.Unlock()
-
-	// 2) run expiration cleanup *outside* the clock lock
+	// Advance simulated clock inside the server, then run clean-up outside the lock.
+	now := s.srv.AdvanceClock(d)
 	s.store.CleanUpExpired(now)
-}
-
-// now returns the current simulated time.
-func (s *MiniValkey) now() time.Time {
-	s.clockMu.RLock()
-	defer s.clockMu.RUnlock()
-	return s.clockBase.Add(s.offset)
 }
