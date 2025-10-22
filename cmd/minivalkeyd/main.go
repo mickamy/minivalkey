@@ -16,7 +16,7 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("minivalkey listening at", s.Addr())
-	defer func(s *minivalkey.Server) {
+	defer func(s *minivalkey.MiniValkey) {
 		_ = s.Close()
 	}(s)
 
