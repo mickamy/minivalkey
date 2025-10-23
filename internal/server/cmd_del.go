@@ -12,7 +12,7 @@ func (s *Server) cmdDel(cmd resp.Command, args resp.Args, w *resp.Writer) error 
 	for _, a := range args[1:] {
 		keys = append(keys, string(a))
 	}
-	n := s.store.Del(keys...)
+	n := s.db.Del(keys...)
 	if err := w.WriteInt(int64(n)); err != nil {
 		return err
 	}

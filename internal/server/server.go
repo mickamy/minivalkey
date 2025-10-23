@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/clock"
+	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/logger"
 	"github.com/mickamy/minivalkey/internal/resp"
-	"github.com/mickamy/minivalkey/internal/store"
 )
 
 type handleFunc func(cmd resp.Command, args resp.Args, w *resp.Writer) error
@@ -21,13 +21,13 @@ type Server struct {
 	listener net.Listener
 	doneCh   chan struct{}
 
-	store *store.Store
+	db    *db.DB
 	clock *clock.Clock
 
 	cmds map[string]handleFunc
 }
 
-// New wires a Store to a net.Listener and seeds the simulated clock.
+// New wires a DB to a net.Listener and seeds the simulated clock.
 func New(ln net.Listener) (*Server, error) {
 	if ln == nil {
 		return nil, errors.New("listener is nil")
@@ -35,7 +35,7 @@ func New(ln net.Listener) (*Server, error) {
 	s := &Server{
 		listener: ln,
 		doneCh:   make(chan struct{}),
-		store:    store.New(),
+		db:       db.New(),
 		clock:    clock.New(time.Now()),
 		cmds:     make(map[string]handleFunc),
 	}
@@ -152,5 +152,5 @@ func (s *Server) FastForward(d time.Duration) {
 
 // CleanUpExpired removes expired keys based on the current simulated time.
 func (s *Server) CleanUpExpired(now time.Time) {
-	s.store.CleanUpExpired(now)
+	s.db.CleanUpExpired(now)
 }

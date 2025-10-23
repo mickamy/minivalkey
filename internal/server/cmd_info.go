@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
-	"github.com/mickamy/minivalkey/internal/store"
 )
 
 var (
@@ -24,7 +24,7 @@ func (s *Server) cmdInfo(cmd resp.Command, args resp.Args, w *resp.Writer) error
 	}
 	// Build content based on requested section.
 	now := s.Now()
-	txt, ok := buildInfo(section, now, s.store, s.uptimeSeconds(now))
+	txt, ok := buildInfo(section, now, s.db, s.uptimeSeconds(now))
 	if !ok {
 		return w.WriteErrorAndFlush(ErrInfoUnknownSection)
 	}
@@ -37,7 +37,7 @@ func (s *Server) cmdInfo(cmd resp.Command, args resp.Args, w *resp.Writer) error
 
 // buildInfo builds an INFO string for a given section.
 // Returns (text, true) if section is supported; ("", false) otherwise.
-func buildInfo(section string, now time.Time, st *store.Store, uptimeSec int64) (string, bool) {
+func buildInfo(section string, now time.Time, st *db.DB, uptimeSec int64) (string, bool) {
 	switch section {
 	case "all", "default":
 		var b strings.Builder
@@ -84,7 +84,7 @@ func infoServer(now time.Time, uptimeSec int64) string {
 	return b.String()
 }
 
-func infoMemory(now time.Time, st *store.Store) string {
+func infoMemory(now time.Time, st *db.DB) string {
 	keys, expires, _ := st.Stats(now)
 	var b strings.Builder
 	b.WriteString("# Memory\r\n")
@@ -99,7 +99,7 @@ func infoMemory(now time.Time, st *store.Store) string {
 	return b.String()
 }
 
-func infoKeyspace(now time.Time, st *store.Store) string {
+func infoKeyspace(now time.Time, st *db.DB) string {
 	keys, expires, avgTTLms := st.Stats(now)
 	var b strings.Builder
 	b.WriteString("# Keyspace\r\n")

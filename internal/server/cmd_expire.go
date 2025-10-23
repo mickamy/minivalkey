@@ -13,7 +13,7 @@ func (s *Server) cmdExpire(cmd resp.Command, args resp.Args, w *resp.Writer) err
 	if !ok {
 		return w.WriteErrorAndFlush(ErrValueNotInteger)
 	}
-	if s.store.Expire(s.Now(), key, sec) {
+	if s.db.Expire(s.Now(), key, sec) {
 		if err := w.WriteInt(1); err != nil {
 			return err
 		}

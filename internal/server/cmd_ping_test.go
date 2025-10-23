@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/clock"
+	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
-	"github.com/mickamy/minivalkey/internal/store"
 )
 
 func TestServer_cmdPing(t *testing.T) {
@@ -53,7 +53,7 @@ func TestServer_cmdPing(t *testing.T) {
 			t.Parallel()
 
 			srv := &Server{
-				store: store.New(),
+				db:    db.New(),
 				clock: clock.New(now),
 			}
 

@@ -1,4 +1,4 @@
-package store
+package db
 
 import (
 	"testing"
@@ -12,14 +12,14 @@ func TestStore_GetString(t *testing.T) {
 
 	tcs := []struct {
 		name    string
-		arrange func(*Store)
+		arrange func(*DB)
 		key     string
 		want    string
 		wantOK  bool
 	}{
 		{
 			name: "returns stored value",
-			arrange: func(st *Store) {
+			arrange: func(st *DB) {
 				st.SetString("foo", "bar", time.Time{})
 			},
 			key:    "foo",
@@ -28,7 +28,7 @@ func TestStore_GetString(t *testing.T) {
 		},
 		{
 			name: "removes expired key on access",
-			arrange: func(st *Store) {
+			arrange: func(st *DB) {
 				st.SetString("gone", "x", now.Add(-time.Second))
 			},
 			key:    "gone",
@@ -54,7 +54,7 @@ func TestStore_GetString(t *testing.T) {
 				t.Fatalf("GetString(%q) = (%q,%v); want (%q,%v)", tc.key, got, ok, tc.want, tc.wantOK)
 			}
 			if !tc.wantOK && tc.arrange != nil {
-				if _, exists := st.data[tc.key]; exists {
+				if _, exists := st.entries[tc.key]; exists {
 					t.Fatalf("expected key %q to be removed after access", tc.key)
 				}
 			}
@@ -67,13 +67,13 @@ func TestStore_Del(t *testing.T) {
 
 	tcs := []struct {
 		name    string
-		arrange func(*Store)
+		arrange func(*DB)
 		keys    []string
 		want    int
 	}{
 		{
 			name: "removes existing keys",
-			arrange: func(st *Store) {
+			arrange: func(st *DB) {
 				st.SetString("foo", "bar", time.Time{})
 				st.SetString("baz", "qux", time.Time{})
 			},
@@ -115,13 +115,13 @@ func TestStore_Exists(t *testing.T) {
 
 	tcs := []struct {
 		name    string
-		arrange func(*Store)
+		arrange func(*DB)
 		keys    []string
 		want    int
 	}{
 		{
 			name: "counts present keys",
-			arrange: func(st *Store) {
+			arrange: func(st *DB) {
 				st.SetString("foo", "bar", time.Time{})
 				st.SetString("baz", "qux", now.Add(time.Minute))
 			},
@@ -130,7 +130,7 @@ func TestStore_Exists(t *testing.T) {
 		},
 		{
 			name: "skips expired keys",
-			arrange: func(st *Store) {
+			arrange: func(st *DB) {
 				st.SetString("old", "x", now.Add(-time.Second))
 				st.SetString("fresh", "y", time.Time{})
 			},
@@ -138,7 +138,7 @@ func TestStore_Exists(t *testing.T) {
 			want: 1,
 		},
 		{
-			name: "returns zero when store is empty",
+			name: "returns zero when db is empty",
 			keys: []string{"foo"},
 			want: 0,
 		},
@@ -167,21 +167,21 @@ func TestStore_Expire(t *testing.T) {
 
 	tcs := []struct {
 		name    string
-		arrange func(*Store)
+		arrange func(*DB)
 		key     string
 		sec     int64
 		want    bool
-		check   func(*testing.T, *Store)
+		check   func(*testing.T, *DB)
 	}{
 		{
 			name: "sets expiration when key exists",
-			arrange: func(st *Store) {
+			arrange: func(st *DB) {
 				st.SetString("foo", "bar", time.Time{})
 			},
 			key:  "foo",
 			sec:  10,
 			want: true,
-			check: func(t *testing.T, st *Store) {
+			check: func(t *testing.T, st *DB) {
 				if ttl := st.TTL(now.Add(5*time.Second), "foo"); ttl != 5 {
 					t.Fatalf("expected ttl 5, got %d", ttl)
 				}
@@ -189,13 +189,13 @@ func TestStore_Expire(t *testing.T) {
 		},
 		{
 			name: "removes expiration when seconds negative",
-			arrange: func(st *Store) {
+			arrange: func(st *DB) {
 				st.SetString("foo", "bar", now.Add(10*time.Second))
 			},
 			key:  "foo",
 			sec:  -1,
 			want: true,
-			check: func(t *testing.T, st *Store) {
+			check: func(t *testing.T, st *DB) {
 				if ttl := st.TTL(now, "foo"); ttl != -1 {
 					t.Fatalf("expected ttl -1, got %d", ttl)
 				}
@@ -235,13 +235,13 @@ func TestStore_TTL(t *testing.T) {
 
 	tcs := []struct {
 		name    string
-		arrange func(*Store)
+		arrange func(*DB)
 		key     string
 		want    int64
 	}{
 		{
 			name: "returns remaining seconds when key has expiry",
-			arrange: func(st *Store) {
+			arrange: func(st *DB) {
 				st.SetString("foo", "bar", now.Add(10*time.Second))
 			},
 			key:  "foo",
@@ -249,7 +249,7 @@ func TestStore_TTL(t *testing.T) {
 		},
 		{
 			name: "returns minus one when key has no expiry",
-			arrange: func(st *Store) {
+			arrange: func(st *DB) {
 				st.SetString("foo", "bar", time.Time{})
 			},
 			key:  "foo",
@@ -262,7 +262,7 @@ func TestStore_TTL(t *testing.T) {
 		},
 		{
 			name: "removes expired key and returns minus two",
-			arrange: func(st *Store) {
+			arrange: func(st *DB) {
 				st.SetString("foo", "bar", now.Add(-time.Second))
 			},
 			key:  "foo",
@@ -283,7 +283,7 @@ func TestStore_TTL(t *testing.T) {
 				t.Fatalf("TTL(%q) = %d; want %d", tc.key, got, tc.want)
 			}
 			if tc.want == -2 {
-				if _, exists := st.data[tc.key]; exists {
+				if _, exists := st.entries[tc.key]; exists {
 					t.Fatalf("expected key %q to be removed after TTL check", tc.key)
 				}
 			}

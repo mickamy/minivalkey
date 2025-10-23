@@ -1,4 +1,4 @@
-package store
+package db
 
 import (
 	"sync"
@@ -20,39 +20,39 @@ type entry struct {
 	expireAt time.Time // zero => no expiry
 }
 
-// Store is a minimal in-memory KV with TTL support.
+// DB is a minimal in-memory KV with TTL support.
 // Concurrency: RWMutex guards all access.
-type Store struct {
-	mu   sync.RWMutex
-	data map[string]*entry
+type DB struct {
+	mu      sync.RWMutex
+	entries map[string]*entry
 }
 
-// New constructs an empty store.
-func New() *Store {
-	return &Store{data: make(map[string]*entry)}
+// New constructs an empty db.
+func New() *DB {
+	return &DB{entries: make(map[string]*entry)}
 }
 
 // SetString sets key to string value with optional expiration.
-func (st *Store) SetString(k, v string, expireAt time.Time) {
-	st.mu.Lock()
-	st.data[k] = &entry{typ: TString, s: v, expireAt: expireAt}
-	st.mu.Unlock()
+func (db *DB) SetString(k, v string, expireAt time.Time) {
+	db.mu.Lock()
+	db.entries[k] = &entry{typ: TString, s: v, expireAt: expireAt}
+	db.mu.Unlock()
 }
 
 // GetString fetches string value if key exists and is not expired.
 // Returns (value, true) if ok; otherwise ("", false).
-func (st *Store) GetString(now time.Time, k string) (string, bool) {
-	st.mu.RLock()
-	e, ok := st.data[k]
-	st.mu.RUnlock()
+func (db *DB) GetString(now time.Time, k string) (string, bool) {
+	db.mu.RLock()
+	e, ok := db.entries[k]
+	db.mu.RUnlock()
 	if !ok {
 		return "", false
 	}
 	// Lazy expiration on access
 	if !e.expireAt.IsZero() && now.After(e.expireAt) {
-		st.mu.Lock()
-		delete(st.data, k)
-		st.mu.Unlock()
+		db.mu.Lock()
+		delete(db.entries, k)
+		db.mu.Unlock()
 		return "", false
 	}
 	if e.typ != TString {
@@ -62,13 +62,13 @@ func (st *Store) GetString(now time.Time, k string) (string, bool) {
 }
 
 // Del deletes given keys and returns the number of removed entries.
-func (st *Store) Del(keys ...string) int {
-	st.mu.Lock()
-	defer st.mu.Unlock()
+func (db *DB) Del(keys ...string) int {
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	n := 0
 	for _, k := range keys {
-		if _, ok := st.data[k]; ok {
-			delete(st.data, k)
+		if _, ok := db.entries[k]; ok {
+			delete(db.entries, k)
 			n++
 		}
 	}
@@ -76,17 +76,17 @@ func (st *Store) Del(keys ...string) int {
 }
 
 // Exists returns count of keys that exist and are not expired at "now".
-func (st *Store) Exists(now time.Time, keys ...string) int {
-	st.mu.Lock()
-	defer st.mu.Unlock()
+func (db *DB) Exists(now time.Time, keys ...string) int {
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	n := 0
 	for _, k := range keys {
-		e, ok := st.data[k]
+		e, ok := db.entries[k]
 		if !ok {
 			continue
 		}
 		if !e.expireAt.IsZero() && now.After(e.expireAt) {
-			delete(st.data, k)
+			delete(db.entries, k)
 			continue
 		}
 		n++
@@ -97,10 +97,10 @@ func (st *Store) Exists(now time.Time, keys ...string) int {
 // Expire sets a TTL in seconds for a key.
 // sec < 0 removes expiration (persist).
 // Returns false if key does not exist.
-func (st *Store) Expire(now time.Time, k string, sec int64) bool {
-	st.mu.Lock()
-	defer st.mu.Unlock()
-	e, ok := st.data[k]
+func (db *DB) Expire(now time.Time, k string, sec int64) bool {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	e, ok := db.entries[k]
 	if !ok {
 		return false
 	}
@@ -117,10 +117,10 @@ func (st *Store) Expire(now time.Time, k string, sec int64) bool {
 // Redis semantics:
 //   - -2: key does not exist
 //   - -1: key exists but has no associated expire
-func (st *Store) TTL(now time.Time, k string) int64 {
-	st.mu.RLock()
-	e, ok := st.data[k]
-	st.mu.RUnlock()
+func (db *DB) TTL(now time.Time, k string) int64 {
+	db.mu.RLock()
+	e, ok := db.entries[k]
+	db.mu.RUnlock()
 	if !ok {
 		return -2
 	}
@@ -129,9 +129,9 @@ func (st *Store) TTL(now time.Time, k string) int64 {
 	}
 	if now.After(e.expireAt) {
 		// Ensure consistent view by removing expired entry.
-		st.mu.Lock()
-		delete(st.data, k)
-		st.mu.Unlock()
+		db.mu.Lock()
+		delete(db.entries, k)
+		db.mu.Unlock()
 		return -2
 	}
 	return int64(e.expireAt.Sub(now).Seconds())
@@ -141,14 +141,14 @@ func (st *Store) TTL(now time.Time, k string) int64 {
 // keys: total keys
 // expires: number of keys that have expiration set and are not yet expired at "now"
 // avgTTLms: average TTL in milliseconds among keys that have expiration (>0); 0 if none.
-func (st *Store) Stats(now time.Time) (keys int, expires int, avgTTLms int64) {
-	st.mu.RLock()
-	defer st.mu.RUnlock()
+func (db *DB) Stats(now time.Time) (keys int, expires int, avgTTLms int64) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
 	var ttlSum time.Duration
 	var ttlCount int
 
-	for _, e := range st.data {
+	for _, e := range db.entries {
 		// Skip already expired ones (lazy deletion will remove them later)
 		if !e.expireAt.IsZero() && now.After(e.expireAt) {
 			continue
@@ -171,12 +171,12 @@ func (st *Store) Stats(now time.Time) (keys int, expires int, avgTTLms int64) {
 
 // CleanUpExpired scans entire map and removes expired entries.
 // It's fine for test workloads (small maps). No fancy wheels required.
-func (st *Store) CleanUpExpired(now time.Time) {
-	st.mu.Lock()
-	for k, e := range st.data {
+func (db *DB) CleanUpExpired(now time.Time) {
+	db.mu.Lock()
+	for k, e := range db.entries {
 		if !e.expireAt.IsZero() && now.After(e.expireAt) {
-			delete(st.data, k)
+			delete(db.entries, k)
 		}
 	}
-	st.mu.Unlock()
+	db.mu.Unlock()
 }

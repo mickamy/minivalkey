@@ -9,7 +9,7 @@ func (s *Server) cmdTTL(cmd resp.Command, args resp.Args, w *resp.Writer) error 
 		return w.WriteErrorAndFlush(err)
 	}
 	key := string(args[1])
-	ttl := s.store.TTL(s.Now(), key)
+	ttl := s.db.TTL(s.Now(), key)
 	if err := w.WriteInt(ttl); err != nil {
 		return err
 	}

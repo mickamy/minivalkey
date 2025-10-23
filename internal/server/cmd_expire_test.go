@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/clock"
+	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
-	"github.com/mickamy/minivalkey/internal/store"
 )
 
 func TestServer_cmdExpire(t *testing.T) {
@@ -19,8 +19,8 @@ func TestServer_cmdExpire(t *testing.T) {
 	tcs := []struct {
 		name    string
 		args    resp.Args
-		arrange func(*store.Store)
-		assert  func(*testing.T, *store.Store, *Server)
+		arrange func(*db.DB)
+		assert  func(*testing.T, *db.DB, *Server)
 		want    string
 	}{
 		{
@@ -30,10 +30,10 @@ func TestServer_cmdExpire(t *testing.T) {
 				[]byte("foo"),
 				[]byte("10"),
 			},
-			arrange: func(st *store.Store) {
+			arrange: func(st *db.DB) {
 				st.SetString("foo", "bar", time.Time{})
 			},
-			assert: func(t *testing.T, st *store.Store, srv *Server) {
+			assert: func(t *testing.T, st *db.DB, srv *Server) {
 				if ttl := st.TTL(srv.Now(), "foo"); ttl != 10 {
 					t.Fatalf("expected ttl 10, got %d", ttl)
 				}
@@ -47,11 +47,11 @@ func TestServer_cmdExpire(t *testing.T) {
 				[]byte("foo"),
 				[]byte("-1"),
 			},
-			arrange: func(st *store.Store) {
+			arrange: func(st *db.DB) {
 				st.SetString("foo", "bar", now.Add(10*time.Second))
 				st.Expire(now, "foo", 10)
 			},
-			assert: func(t *testing.T, st *store.Store, srv *Server) {
+			assert: func(t *testing.T, st *db.DB, srv *Server) {
 				if ttl := st.TTL(srv.Now(), "foo"); ttl != -1 {
 					t.Fatalf("expected ttl -1, got %d", ttl)
 				}
@@ -91,12 +91,12 @@ func TestServer_cmdExpire(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := store.New()
+			st := db.New()
 			if tc.arrange != nil {
 				tc.arrange(st)
 			}
 			srv := &Server{
-				store: st,
+				db:    st,
 				clock: clock.New(now),
 			}
 
