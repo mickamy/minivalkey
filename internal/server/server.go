@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/clock"
@@ -19,11 +20,13 @@ type handleFunc func(w *resp.Writer, r *request) error
 // Server wraps a raw TCP listener and processes RESP2 commands.
 // One goroutine per accepted connection; each has its own bufio Reader/Writer.
 type Server struct {
-	listener net.Listener
-	doneCh   chan struct{}
-	dbMap    map[int]*db.DB
-	clock    *clock.Clock
-	handlers map[string]handleFunc
+	listener       net.Listener
+	doneCh         chan struct{}
+	dbMu           sync.RWMutex
+	dbMap          map[int]*db.DB
+	cleanUpBufPool sync.Pool
+	clock          *clock.Clock
+	handlers       map[string]handleFunc
 }
 
 // New wires a DB to a net.Listener and seeds the simulated clock.
@@ -35,6 +38,9 @@ func New(ln net.Listener) (*Server, error) {
 		listener: ln,
 		doneCh:   make(chan struct{}),
 		dbMap:    make(map[int]*db.DB),
+		cleanUpBufPool: sync.Pool{
+			New: func() any { return make([]*db.DB, 0, 8) },
+		},
 		clock:    clock.New(time.Now()),
 		handlers: make(map[string]handleFunc),
 	}
@@ -154,17 +160,51 @@ func (s *Server) FastForward(d time.Duration) {
 
 // CleanUpExpired removes expired keys based on the current simulated time.
 func (s *Server) CleanUpExpired(now time.Time) {
+	bufAny := s.cleanUpBufPool.Get()
+	var dbs []*db.DB
+	if bufAny != nil {
+		dbs = bufAny.([]*db.DB)
+	}
+	s.dbMu.RLock()
+	n := len(s.dbMap)
+	if cap(dbs) < n {
+		dbs = make([]*db.DB, 0, n)
+	} else {
+		dbs = dbs[:0]
+	}
 	for _, d := range s.dbMap {
+		dbs = append(dbs, d)
+	}
+	s.dbMu.RUnlock()
+
+	for _, d := range dbs {
 		d.CleanUpExpired(now)
 	}
+
+	for i := range dbs {
+		dbs[i] = nil
+	}
+	s.cleanUpBufPool.Put(dbs[:0])
 }
 
 // db returns the DB instance for the selected database in the session.
 func (s *Server) db(sess *session.Session) *db.DB {
+	s.dbMu.RLock()
 	d, ok := s.dbMap[sess.SelectedDB]
-	if !ok {
-		d = db.New()
-		s.dbMap[sess.SelectedDB] = d
+	s.dbMu.RUnlock()
+	if ok {
+		return d
 	}
+
+	s.dbMu.Lock()
+	defer s.dbMu.Unlock()
+
+	d, ok = s.dbMap[sess.SelectedDB]
+	if ok {
+		return d
+	}
+
+	d = db.New()
+	s.dbMap[sess.SelectedDB] = d
 	return d
 }
