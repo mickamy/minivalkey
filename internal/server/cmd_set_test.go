@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 func TestServer_cmdSet(t *testing.T) {
 	t.Parallel()
 
-	now := time.Now()
+	now := time.Unix(1_000, 0)
 
 	tcs := []struct {
 		name    string
@@ -75,6 +76,38 @@ func TestServer_cmdSet(t *testing.T) {
 			want: "+OK\r\n",
 		},
 		{
+			name: "sets expire with EXAT",
+			args: resp.Args{
+				[]byte("set"),
+				[]byte("foo"),
+				[]byte("bar"),
+				[]byte("EXAT"),
+				[]byte(strconv.FormatInt(now.Add(15*time.Second).Unix(), 10)),
+			},
+			assert: func(t *testing.T, db *db.DB) {
+				if ttl := db.TTL(now, "foo"); ttl != 15 {
+					t.Fatalf("expected ttl 15, got %d", ttl)
+				}
+			},
+			want: "+OK\r\n",
+		},
+		{
+			name: "sets expire with PXAT",
+			args: resp.Args{
+				[]byte("set"),
+				[]byte("foo"),
+				[]byte("bar"),
+				[]byte("pxat"),
+				[]byte(strconv.FormatInt(now.Add(1500*time.Millisecond).UnixMilli(), 10)),
+			},
+			assert: func(t *testing.T, db *db.DB) {
+				if ttl := db.TTL(now, "foo"); ttl != 1 {
+					t.Fatalf("expected ttl 1, got %d", ttl)
+				}
+			},
+			want: "+OK\r\n",
+		},
+		{
 			name: "rejects invalid expire time",
 			args: resp.Args{
 				[]byte("set"),
@@ -121,6 +154,89 @@ func TestServer_cmdSet(t *testing.T) {
 				}
 			},
 			want: "+OK\r\n",
+		},
+		{
+			name: "returns old value with GET option",
+			args: resp.Args{
+				[]byte("set"),
+				[]byte("foo"),
+				[]byte("baz"),
+				[]byte("GET"),
+			},
+			arrange: func(db *db.DB) {
+				db.SetString("foo", "bar", time.Time{})
+			},
+			assert: func(t *testing.T, db *db.DB) {
+				got, ok := db.GetString(time.Time{}, "foo")
+				if !ok || got != "baz" {
+					t.Fatalf("expected foo=baz, got %q ok=%v", got, ok)
+				}
+			},
+			want: "$3\r\nbar\r\n",
+		},
+		{
+			name: "returns null with GET when key missing",
+			args: resp.Args{
+				[]byte("set"),
+				[]byte("foo"),
+				[]byte("baz"),
+				[]byte("GET"),
+			},
+			assert: func(t *testing.T, db *db.DB) {
+				got, ok := db.GetString(time.Time{}, "foo")
+				if !ok || got != "baz" {
+					t.Fatalf("expected foo=baz, got %q ok=%v", got, ok)
+				}
+			},
+			want: "$-1\r\n",
+		},
+		{
+			name: "returns null with GET when NX succeeds on fresh key",
+			args: resp.Args{
+				[]byte("set"),
+				[]byte("foo"),
+				[]byte("baz"),
+				[]byte("NX"),
+				[]byte("GET"),
+			},
+			assert: func(t *testing.T, db *db.DB) {
+				got, ok := db.GetString(time.Time{}, "foo")
+				if !ok || got != "baz" {
+					t.Fatalf("expected foo=baz, got %q ok=%v", got, ok)
+				}
+			},
+			want: "$-1\r\n",
+		},
+		{
+			name: "returns null with GET when NX condition fails",
+			args: resp.Args{
+				[]byte("set"),
+				[]byte("foo"),
+				[]byte("new"),
+				[]byte("NX"),
+				[]byte("GET"),
+			},
+			arrange: func(db *db.DB) {
+				db.SetString("foo", "old", time.Time{})
+			},
+			assert: func(t *testing.T, db *db.DB) {
+				got, ok := db.GetString(time.Time{}, "foo")
+				if !ok || got != "old" {
+					t.Fatalf("expected foo to remain old, got %q ok=%v", got, ok)
+				}
+			},
+			want: "$-1\r\n",
+		},
+		{
+			name: "rejects duplicate GET option",
+			args: resp.Args{
+				[]byte("set"),
+				[]byte("foo"),
+				[]byte("bar"),
+				[]byte("GET"),
+				[]byte("GET"),
+			},
+			want: "-ERR syntax error\r\n",
 		},
 		{
 			name: "returns null when NX condition fails",

@@ -49,8 +49,8 @@ func (db *DB) SetString(k, v string, expireAt time.Time) {
 }
 
 // SetStringWithOptions sets key to value honouring NX/XX/KEEPTTL and optional expiry.
-// Returns true if the value was stored, false if the preconditions failed (e.g. NX with existing key).
-func (db *DB) SetStringWithOptions(now time.Time, k, v string, opts SetOptions) bool {
+// Returns (stored, prevValue, prevExists). When stored is false the key was not updated.
+func (db *DB) SetStringWithOptions(now time.Time, k, v string, opts SetOptions) (bool, string, bool) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -63,14 +63,21 @@ func (db *DB) SetStringWithOptions(now time.Time, k, v string, opts SetOptions) 
 	}
 
 	if opts.NX && exists {
-		return false
+		return false, "", false
 	}
 	if opts.XX && !exists {
-		return false
+		return false, "", false
+	}
+
+	prev := ""
+	prevExists := false
+	if exists && e != nil && e.typ == TString {
+		prev = e.s
+		prevExists = true
 	}
 
 	expireAt := time.Time{}
-	if opts.KeepTTL && exists {
+	if opts.KeepTTL && exists && e != nil {
 		expireAt = e.expireAt
 	}
 	if opts.HasExpire {
@@ -78,7 +85,7 @@ func (db *DB) SetStringWithOptions(now time.Time, k, v string, opts SetOptions) 
 	}
 
 	db.entries[k] = &entry{typ: TString, s: v, expireAt: expireAt}
-	return true
+	return true, prev, prevExists
 }
 
 // GetString fetches string value if key exists and is not expired.
