@@ -35,7 +35,7 @@ func validateArgCountAtMost(max int) cmdValidator {
 	}
 }
 
-func (s *Server) validateCommand(cmd resp.Command, args resp.Args, validators ...cmdValidator) error {
+func validateCommand(cmd resp.Command, args resp.Args, validators ...cmdValidator) error {
 	for _, v := range validators {
 		if err := v(cmd, args); err != nil {
 			return err

@@ -9,6 +9,7 @@ import (
 	"github.com/mickamy/minivalkey/internal/clock"
 	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
+	"github.com/mickamy/minivalkey/internal/session"
 )
 
 func TestServer_cmdTTL(t *testing.T) {
@@ -71,14 +72,14 @@ func TestServer_cmdTTL(t *testing.T) {
 				tc.arrange(st)
 			}
 			srv := &Server{
-				db:    st,
 				clock: clock.New(base),
 			}
 
 			buf := new(bytes.Buffer)
 			w := resp.NewWriter(bufio.NewWriter(buf))
+			req := newRequest(session.New(), "TTL", tc.args)
 
-			if err := srv.cmdTTL("TTL", tc.args, w); err != nil {
+			if err := srv.cmdTTL(w, req); err != nil {
 				t.Fatalf("cmdTTL returned error: %v", err)
 			}
 			if err := w.Flush(); err != nil {

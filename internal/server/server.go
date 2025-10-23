@@ -11,20 +11,19 @@ import (
 	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/logger"
 	"github.com/mickamy/minivalkey/internal/resp"
+	"github.com/mickamy/minivalkey/internal/session"
 )
 
-type handleFunc func(cmd resp.Command, args resp.Args, w *resp.Writer) error
+type handleFunc func(w *resp.Writer, r *request) error
 
 // Server wraps a raw TCP listener and processes RESP2 commands.
 // One goroutine per accepted connection; each has its own bufio Reader/Writer.
 type Server struct {
 	listener net.Listener
 	doneCh   chan struct{}
-
-	db    *db.DB
-	clock *clock.Clock
-
-	cmds map[string]handleFunc
+	dbMap    map[int]*db.DB
+	clock    *clock.Clock
+	handlers map[string]handleFunc
 }
 
 // New wires a DB to a net.Listener and seeds the simulated clock.
@@ -35,9 +34,9 @@ func New(ln net.Listener) (*Server, error) {
 	s := &Server{
 		listener: ln,
 		doneCh:   make(chan struct{}),
-		db:       db.New(),
+		dbMap:    make(map[int]*db.DB),
 		clock:    clock.New(time.Now()),
-		cmds:     make(map[string]handleFunc),
+		handlers: make(map[string]handleFunc),
 	}
 
 	handlers := map[string]handleFunc{
@@ -88,6 +87,7 @@ func (s *Server) handleConn(c net.Conn) {
 
 	r := resp.NewReader(bufio.NewReader(c))
 	w := resp.NewWriter(bufio.NewWriter(c))
+	sess := session.New()
 
 	for {
 		args, err := r.ReadArrayBulk()
@@ -104,7 +104,7 @@ func (s *Server) handleConn(c net.Conn) {
 		}
 
 		cmd := args.Cmd()
-		handle, ok := s.cmds[cmd.String()]
+		handle, ok := s.handlers[cmd.String()]
 		if !ok {
 			logger.Warn("unknown command", "cmd", cmd)
 
@@ -115,7 +115,9 @@ func (s *Server) handleConn(c net.Conn) {
 			continue
 		}
 
-		if err := handle(cmd, args, w); err != nil {
+		req := newRequest(sess, cmd, args)
+
+		if err := handle(w, req); err != nil {
 			logger.Error("command handler error", "cmd", cmd.String(), "err", err)
 			return
 		}
@@ -127,10 +129,10 @@ func (s *Server) handleConn(c net.Conn) {
 }
 
 func (s *Server) register(name string, handle handleFunc) error {
-	if _, exists := s.cmds[name]; exists {
+	if _, exists := s.handlers[name]; exists {
 		return fmt.Errorf("command %s already exists", name)
 	}
-	s.cmds[name] = handle
+	s.handlers[name] = handle
 	return nil
 }
 
@@ -152,5 +154,17 @@ func (s *Server) FastForward(d time.Duration) {
 
 // CleanUpExpired removes expired keys based on the current simulated time.
 func (s *Server) CleanUpExpired(now time.Time) {
-	s.db.CleanUpExpired(now)
+	for _, d := range s.dbMap {
+		d.CleanUpExpired(now)
+	}
+}
+
+// db returns the DB instance for the selected database in the session.
+func (s *Server) db(sess *session.Session) *db.DB {
+	d, ok := s.dbMap[sess.SelectedDB]
+	if !ok {
+		d = db.New()
+		s.dbMap[sess.SelectedDB] = d
+	}
+	return d
 }

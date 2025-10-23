@@ -6,15 +6,15 @@ import (
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
-func (s *Server) cmdHello(cmd resp.Command, args resp.Args, w *resp.Writer) error {
+func (s *Server) cmdHello(w *resp.Writer, r *request) error {
 	// Minimal HELLO handler:
 	// - Accepts "HELLO", "HELLO 2", and "HELLO 3".
 	// - Always negotiates RESP2 (proto=2) and returns a map as alternating key/value array.
 	// - Ignores other HELLO options for now (AUTH, SETNAME, etc.).
 	wantProto := 0
-	if len(args) >= 2 {
+	if len(r.args) >= 2 {
 		// If arg[1] is a number (e.g., "2" or "3"), accept it but we'll still serve RESP2.
-		if n, ok := resp.ParseInt(args[1]); ok {
+		if n, ok := resp.ParseInt(r.args[1]); ok {
 			wantProto = int(n) // kept only for debugging; we don't switch to RESP3
 			_ = wantProto
 		}

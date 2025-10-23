@@ -9,6 +9,7 @@ import (
 	"github.com/mickamy/minivalkey/internal/clock"
 	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
+	"github.com/mickamy/minivalkey/internal/session"
 )
 
 func TestServer_cmdExists(t *testing.T) {
@@ -68,14 +69,14 @@ func TestServer_cmdExists(t *testing.T) {
 				tc.arrange(st, base)
 			}
 			srv := &Server{
-				db:    st,
 				clock: clock.New(base),
 			}
 
 			buf := new(bytes.Buffer)
 			w := resp.NewWriter(bufio.NewWriter(buf))
+			req := newRequest(session.New(), "EXISTS", tc.args)
 
-			if err := srv.cmdExists(resp.Command("EXISTS"), tc.args, w); err != nil {
+			if err := srv.cmdExists(w, req); err != nil {
 				t.Fatalf("cmdExists returned error: %v", err)
 			}
 			if err := w.Flush(); err != nil {

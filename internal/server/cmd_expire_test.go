@@ -9,6 +9,7 @@ import (
 	"github.com/mickamy/minivalkey/internal/clock"
 	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
+	"github.com/mickamy/minivalkey/internal/session"
 )
 
 func TestServer_cmdExpire(t *testing.T) {
@@ -96,14 +97,14 @@ func TestServer_cmdExpire(t *testing.T) {
 				tc.arrange(st)
 			}
 			srv := &Server{
-				db:    st,
 				clock: clock.New(now),
 			}
 
 			buf := new(bytes.Buffer)
 			w := resp.NewWriter(bufio.NewWriter(buf))
+			req := newRequest(session.New(), "EXPIRE", tc.args)
 
-			if err := srv.cmdExpire("EXPIRE", tc.args, w); err != nil {
+			if err := srv.cmdExpire(w, req); err != nil {
 				t.Fatalf("cmdExpire returned error: %v", err)
 			}
 			if err := w.Flush(); err != nil {

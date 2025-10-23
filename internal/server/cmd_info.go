@@ -10,23 +10,19 @@ import (
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
-var (
-	ErrInfoUnknownSection = fmt.Errorf("ERR unknown section")
-)
-
-func (s *Server) cmdInfo(cmd resp.Command, args resp.Args, w *resp.Writer) error {
+func (s *Server) cmdInfo(w *resp.Writer, r *request) error {
 	// RESP2: INFO [section]
 	// We support sections: "server", "memory", "keyspace", plus "all"/"default".
 	// Unknown sections -> error (to match Redis/Valkey behavior).
 	section := "default"
-	if len(args) == 2 {
-		section = strings.ToLower(string(args[1]))
+	if len(r.args) == 2 {
+		section = strings.ToLower(string(r.args[1]))
 	}
 	// Build content based on requested section.
 	now := s.Now()
-	txt, ok := buildInfo(section, now, s.db, s.uptimeSeconds(now))
+	txt, ok := buildInfo(section, now, s.db(r.session), s.uptimeSeconds(now))
 	if !ok {
-		return w.WriteErrorAndFlush(ErrInfoUnknownSection)
+		return w.WriteErrorAndFlush(ErrUnknownSection)
 	}
 	if err := w.WriteBulk([]byte(txt)); err != nil {
 		return err

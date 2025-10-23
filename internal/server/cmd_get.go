@@ -4,12 +4,12 @@ import (
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
-func (s *Server) cmdGet(cmd resp.Command, args resp.Args, w *resp.Writer) error {
-	if err := s.validateCommand(cmd, args, validateArgCountExact(2)); err != nil {
+func (s *Server) cmdGet(w *resp.Writer, r *request) error {
+	if err := validateCommand(r.cmd, r.args, validateArgCountExact(2)); err != nil {
 		return w.WriteErrorAndFlush(err)
 	}
-	key := string(args[1])
-	if v, ok := s.db.GetString(s.Now(), key); ok {
+	key := string(r.args[1])
+	if v, ok := s.db(r.session).GetString(s.Now(), key); ok {
 		if err := w.WriteBulk([]byte(v)); err != nil {
 			return err
 		}

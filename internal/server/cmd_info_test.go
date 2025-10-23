@@ -10,6 +10,7 @@ import (
 	"github.com/mickamy/minivalkey/internal/clock"
 	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
+	"github.com/mickamy/minivalkey/internal/session"
 )
 
 func TestServer_cmdInfo(t *testing.T) {
@@ -71,14 +72,14 @@ func TestServer_cmdInfo(t *testing.T) {
 				tc.arrange(st)
 			}
 			srv := &Server{
-				db:    st,
 				clock: clock.New(base),
 			}
 
 			buf := new(bytes.Buffer)
 			w := resp.NewWriter(bufio.NewWriter(buf))
+			req := newRequest(session.New(), "INFO", tc.args)
 
-			if err := srv.cmdInfo("INFO", tc.args, w); err != nil {
+			if err := srv.cmdInfo(w, req); err != nil {
 				t.Fatalf("cmdInfo returned error: %v", err)
 			}
 			if err := w.Flush(); err != nil {
