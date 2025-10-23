@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/clock"
+	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
-	"github.com/mickamy/minivalkey/internal/store"
 )
 
 func TestServer_cmdInfo(t *testing.T) {
@@ -20,16 +20,16 @@ func TestServer_cmdInfo(t *testing.T) {
 	tcs := []struct {
 		name    string
 		args    resp.Args
-		arrange func(*store.Store)
+		arrange func(*db.DB)
 		want    string
-		wantFn  func(*store.Store, *Server) string
+		wantFn  func(*db.DB, *Server) string
 	}{
 		{
 			name: "returns default section when none is provided",
 			args: resp.Args{
 				[]byte("info"),
 			},
-			wantFn: func(st *store.Store, srv *Server) string {
+			wantFn: func(st *db.DB, srv *Server) string {
 				now := srv.Now()
 				txt, _ := buildInfo("default", now, st, srv.uptimeSeconds(now))
 				return fmt.Sprintf("$%d\r\n%s\r\n", len(txt), txt)
@@ -41,11 +41,11 @@ func TestServer_cmdInfo(t *testing.T) {
 				[]byte("info"),
 				[]byte("memory"),
 			},
-			arrange: func(st *store.Store) {
+			arrange: func(st *db.DB) {
 				st.SetString("foo", "bar", time.Time{})
 				st.SetString("baz", "qux", base.Add(30*time.Second))
 			},
-			wantFn: func(st *store.Store, srv *Server) string {
+			wantFn: func(st *db.DB, srv *Server) string {
 				now := srv.Now()
 				txt, _ := buildInfo("memory", now, st, srv.uptimeSeconds(now))
 				return fmt.Sprintf("$%d\r\n%s\r\n", len(txt), txt)
@@ -66,12 +66,12 @@ func TestServer_cmdInfo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := store.New()
+			st := db.New()
 			if tc.arrange != nil {
 				tc.arrange(st)
 			}
 			srv := &Server{
-				store: st,
+				db:    st,
 				clock: clock.New(base),
 			}
 

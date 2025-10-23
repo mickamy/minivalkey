@@ -14,7 +14,7 @@ func (s *Server) cmdHello(cmd resp.Command, args resp.Args, w *resp.Writer) erro
 	wantProto := 0
 	if len(args) >= 2 {
 		// If arg[1] is a number (e.g., "2" or "3"), accept it but we'll still serve RESP2.
-		if n, ok := parseInt(args[1]); ok {
+		if n, ok := resp.ParseInt(args[1]); ok {
 			wantProto = int(n) // kept only for debugging; we don't switch to RESP3
 			_ = wantProto
 		}

@@ -13,7 +13,7 @@ func (s *Server) cmdExists(cmd resp.Command, args resp.Args, w *resp.Writer) err
 	for _, a := range args[1:] {
 		keys = append(keys, string(a))
 	}
-	count := s.store.Exists(s.Now(), keys...)
+	count := s.db.Exists(s.Now(), keys...)
 	if err := w.WriteInt(int64(count)); err != nil {
 		return err
 	}

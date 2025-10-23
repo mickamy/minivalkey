@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/clock"
+	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
-	"github.com/mickamy/minivalkey/internal/store"
 )
 
 func TestServer_cmdExists(t *testing.T) {
@@ -19,7 +19,7 @@ func TestServer_cmdExists(t *testing.T) {
 	tcs := []struct {
 		name    string
 		args    resp.Args
-		arrange func(*store.Store, time.Time)
+		arrange func(*db.DB, time.Time)
 		want    string
 	}{
 		{
@@ -30,7 +30,7 @@ func TestServer_cmdExists(t *testing.T) {
 				[]byte("bar"),
 				[]byte("baz"),
 			},
-			arrange: func(st *store.Store, now time.Time) {
+			arrange: func(st *db.DB, now time.Time) {
 				st.SetString("foo", "1", time.Time{})
 				st.SetString("bar", "2", time.Time{})
 			},
@@ -43,7 +43,7 @@ func TestServer_cmdExists(t *testing.T) {
 				[]byte("fresh"),
 				[]byte("stale"),
 			},
-			arrange: func(st *store.Store, now time.Time) {
+			arrange: func(st *db.DB, now time.Time) {
 				st.SetString("fresh", "1", time.Time{})
 				st.SetString("stale", "2", now.Add(-time.Second))
 			},
@@ -63,12 +63,12 @@ func TestServer_cmdExists(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := store.New()
+			st := db.New()
 			if tc.arrange != nil {
 				tc.arrange(st, base)
 			}
 			srv := &Server{
-				store: st,
+				db:    st,
 				clock: clock.New(base),
 			}
 

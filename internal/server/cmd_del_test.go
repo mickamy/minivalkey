@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
-	"github.com/mickamy/minivalkey/internal/store"
 )
 
 func TestServer_cmdDel(t *testing.T) {
@@ -16,8 +16,8 @@ func TestServer_cmdDel(t *testing.T) {
 	tcs := []struct {
 		name    string
 		args    resp.Args
-		arrange func(*store.Store)
-		assert  func(*testing.T, *store.Store)
+		arrange func(*db.DB)
+		assert  func(*testing.T, *db.DB)
 		want    string
 	}{
 		{
@@ -27,11 +27,11 @@ func TestServer_cmdDel(t *testing.T) {
 				[]byte("foo"),
 				[]byte("bar"),
 			},
-			arrange: func(st *store.Store) {
+			arrange: func(st *db.DB) {
 				st.SetString("foo", "1", time.Time{})
 				st.SetString("bar", "2", time.Time{})
 			},
-			assert: func(t *testing.T, st *store.Store) {
+			assert: func(t *testing.T, st *db.DB) {
 				if _, ok := st.GetString(time.Time{}, "foo"); ok {
 					t.Fatalf("foo was not deleted")
 				}
@@ -63,11 +63,11 @@ func TestServer_cmdDel(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := store.New()
+			st := db.New()
 			if tc.arrange != nil {
 				tc.arrange(st)
 			}
-			srv := &Server{store: st}
+			srv := &Server{db: st}
 
 			buf := new(bytes.Buffer)
 			w := resp.NewWriter(bufio.NewWriter(buf))

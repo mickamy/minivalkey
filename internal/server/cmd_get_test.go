@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/clock"
+	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
-	"github.com/mickamy/minivalkey/internal/store"
 )
 
 func TestServer_cmdGet(t *testing.T) {
@@ -19,7 +19,7 @@ func TestServer_cmdGet(t *testing.T) {
 	tcs := []struct {
 		name    string
 		args    resp.Args
-		arrange func(*store.Store)
+		arrange func(*db.DB)
 		want    string
 	}{
 		{
@@ -28,7 +28,7 @@ func TestServer_cmdGet(t *testing.T) {
 				[]byte("get"),
 				[]byte("foo"),
 			},
-			arrange: func(st *store.Store) {
+			arrange: func(st *db.DB) {
 				st.SetString("foo", "bar", time.Time{})
 			},
 			want: "$3\r\nbar\r\n",
@@ -55,12 +55,12 @@ func TestServer_cmdGet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := store.New()
+			st := db.New()
 			if tc.arrange != nil {
 				tc.arrange(st)
 			}
 			srv := &Server{
-				store: st,
+				db:    st,
 				clock: clock.New(now),
 			}
 

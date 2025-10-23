@@ -15,7 +15,7 @@ func (s *Server) cmdSet(cmd resp.Command, args resp.Args, w *resp.Writer) error 
 	val := string(args[2])
 
 	// MVP: ignore EX/PX/NX/XX/KEEPTTL options for now.
-	s.store.SetString(key, val, time.Time{})
+	s.db.SetString(key, val, time.Time{})
 	if err := w.WriteString("OK"); err != nil {
 		return err
 	}

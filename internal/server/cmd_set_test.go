@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/clock"
+	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
-	"github.com/mickamy/minivalkey/internal/store"
 )
 
 func TestServer_cmdSet(t *testing.T) {
@@ -19,8 +19,8 @@ func TestServer_cmdSet(t *testing.T) {
 	tcs := []struct {
 		name    string
 		args    resp.Args
-		arrange func(*store.Store)
-		assert  func(*testing.T, *store.Store)
+		arrange func(*db.DB)
+		assert  func(*testing.T, *db.DB)
 		want    string
 	}{
 		{
@@ -30,10 +30,10 @@ func TestServer_cmdSet(t *testing.T) {
 				[]byte("foo"),
 				[]byte("bar"),
 			},
-			assert: func(t *testing.T, st *store.Store) {
+			assert: func(t *testing.T, st *db.DB) {
 				got, ok := st.GetString(time.Time{}, "foo")
 				if !ok {
-					t.Fatalf("foo missing from store")
+					t.Fatalf("foo missing from db")
 				}
 				if got != "bar" {
 					t.Fatalf("expected value bar, got %q", got)
@@ -56,12 +56,12 @@ func TestServer_cmdSet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := store.New()
+			st := db.New()
 			if tc.arrange != nil {
 				tc.arrange(st)
 			}
 			srv := &Server{
-				store: st,
+				db:    st,
 				clock: clock.New(now),
 			}
 

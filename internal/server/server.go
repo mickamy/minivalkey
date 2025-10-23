@@ -8,13 +8,9 @@ import (
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/clock"
+	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/logger"
 	"github.com/mickamy/minivalkey/internal/resp"
-	"github.com/mickamy/minivalkey/internal/store"
-)
-
-var (
-	ErrEmptyCommand = errors.New("ERR empty command")
 )
 
 type handleFunc func(cmd resp.Command, args resp.Args, w *resp.Writer) error
@@ -25,28 +21,22 @@ type Server struct {
 	listener net.Listener
 	doneCh   chan struct{}
 
-	store *store.Store
+	db    *db.DB
 	clock *clock.Clock
 
 	cmds map[string]handleFunc
 }
 
-// New wires a Store to a net.Listener and seeds the simulated clock.
-func New(ln net.Listener, st *store.Store, clk *clock.Clock) (*Server, error) {
+// New wires a DB to a net.Listener and seeds the simulated clock.
+func New(ln net.Listener) (*Server, error) {
 	if ln == nil {
 		return nil, errors.New("listener is nil")
-	}
-	if st == nil {
-		return nil, errors.New("store is nil")
-	}
-	if clk == nil {
-		return nil, errors.New("clock is nil")
 	}
 	s := &Server{
 		listener: ln,
 		doneCh:   make(chan struct{}),
-		store:    st,
-		clock:    clk,
+		db:       db.New(),
+		clock:    clock.New(time.Now()),
 		cmds:     make(map[string]handleFunc),
 	}
 
@@ -154,29 +144,13 @@ func (s *Server) Now() time.Time {
 	return s.clock.Now()
 }
 
-// AdvanceClock moves the simulated clock forward and returns the updated time.
-func (s *Server) AdvanceClock(d time.Duration) time.Time {
-	return s.clock.Advance(d)
+// FastForward advances the internal clock by the specified duration.
+func (s *Server) FastForward(d time.Duration) {
+	now := s.clock.Advance(d)
+	s.CleanUpExpired(now)
 }
 
-func parseInt(b []byte) (int64, bool) {
-	var n int64
-	var neg bool
-	if len(b) == 0 {
-		return 0, false
-	}
-	for i, c := range b {
-		if i == 0 && c == '-' {
-			neg = true
-			continue
-		}
-		if c < '0' || c > '9' {
-			return 0, false
-		}
-		n = n*10 + int64(c-'0')
-	}
-	if neg {
-		n = -n
-	}
-	return n, true
+// CleanUpExpired removes expired keys based on the current simulated time.
+func (s *Server) CleanUpExpired(now time.Time) {
+	s.db.CleanUpExpired(now)
 }
