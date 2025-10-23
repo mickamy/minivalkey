@@ -32,11 +32,53 @@ func New() *DB {
 	return &DB{entries: make(map[string]*entry)}
 }
 
+// SetOptions tweaks SetStringWithOptions behavior.
+type SetOptions struct {
+	NX        bool // Only set if key does not exist
+	XX        bool // Only set if key exists
+	KeepTTL   bool // Retain existing TTL if any
+	ExpireAt  time.Time
+	HasExpire bool
+}
+
 // SetString sets key to string value with optional expiration.
 func (db *DB) SetString(k, v string, expireAt time.Time) {
 	db.mu.Lock()
 	db.entries[k] = &entry{typ: TString, s: v, expireAt: expireAt}
 	db.mu.Unlock()
+}
+
+// SetStringWithOptions sets key to value honouring NX/XX/KEEPTTL and optional expiry.
+// Returns true if the value was stored, false if the preconditions failed (e.g. NX with existing key).
+func (db *DB) SetStringWithOptions(now time.Time, k, v string, opts SetOptions) bool {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	e, exists := db.entries[k]
+	// Drop stale entries so existence checks match read paths.
+	if exists && !e.expireAt.IsZero() && now.After(e.expireAt) {
+		delete(db.entries, k)
+		exists = false
+		e = nil
+	}
+
+	if opts.NX && exists {
+		return false
+	}
+	if opts.XX && !exists {
+		return false
+	}
+
+	expireAt := time.Time{}
+	if opts.KeepTTL && exists {
+		expireAt = e.expireAt
+	}
+	if opts.HasExpire {
+		expireAt = opts.ExpireAt
+	}
+
+	db.entries[k] = &entry{typ: TString, s: v, expireAt: expireAt}
+	return true
 }
 
 // GetString fetches string value if key exists and is not expired.
