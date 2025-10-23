@@ -13,10 +13,6 @@ import (
 	"github.com/mickamy/minivalkey/internal/store"
 )
 
-var (
-	ErrEmptyCommand = errors.New("ERR empty command")
-)
-
 type handleFunc func(cmd resp.Command, args resp.Args, w *resp.Writer) error
 
 // Server wraps a raw TCP listener and processes RESP2 commands.

@@ -6,10 +6,6 @@ import (
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
-var (
-	ErrExpireValueNotInteger = errors.New("ERR value is not an integer or out of range")
-)
-
 func (s *Server) cmdExpire(cmd resp.Command, args resp.Args, w *resp.Writer) error {
 	if err := s.validateCommand(cmd, args, validateArgCountExact(3)); err != nil {
 		return w.WriteErrorAndFlush(err)
@@ -17,7 +13,7 @@ func (s *Server) cmdExpire(cmd resp.Command, args resp.Args, w *resp.Writer) err
 	key := string(args[1])
 	sec, ok := parseInt(args[2])
 	if !ok {
-		return w.WriteErrorAndFlush(ErrExpireValueNotInteger)
+		return w.WriteErrorAndFlush(ErrValueNotInteger)
 	}
 	if s.store.Expire(s.Now(), key, sec) {
 		if err := w.WriteInt(1); err != nil {
