@@ -4,16 +4,16 @@ import (
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
-func (s *Server) cmdExists(cmd resp.Command, args resp.Args, w *resp.Writer) error {
-	if err := s.validateCommand(cmd, args, validateArgCountAtLeast(2)); err != nil {
+func (s *Server) cmdExists(w *resp.Writer, r *request) error {
+	if err := validateCommand(r.cmd, r.args, validateArgCountAtLeast(2)); err != nil {
 		return w.WriteErrorAndFlush(err)
 	}
 
-	keys := make([]string, 0, len(args)-1)
-	for _, a := range args[1:] {
-		keys = append(keys, string(a))
+	keys := make([]string, len(r.args)-1)
+	for i, a := range r.args[1:] {
+		keys[i] = string(a)
 	}
-	count := s.db.Exists(s.Now(), keys...)
+	count := s.db(r.session).Exists(s.Now(), keys...)
 	if err := w.WriteInt(int64(count)); err != nil {
 		return err
 	}

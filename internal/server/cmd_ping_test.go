@@ -9,6 +9,7 @@ import (
 	"github.com/mickamy/minivalkey/internal/clock"
 	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
+	"github.com/mickamy/minivalkey/internal/session"
 )
 
 func TestServer_cmdPing(t *testing.T) {
@@ -52,15 +53,17 @@ func TestServer_cmdPing(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
+			d := db.New()
 			srv := &Server{
-				db:    db.New(),
+				dbMap: map[int]*db.DB{0: d},
 				clock: clock.New(now),
 			}
 
 			buf := new(bytes.Buffer)
 			w := resp.NewWriter(bufio.NewWriter(buf))
+			req := newRequest(session.New(), "PING", tc.args)
 
-			if err := srv.cmdPing("PING", tc.args, w); err != nil {
+			if err := srv.cmdPing(w, req); err != nil {
 				t.Fatalf("cmdPing returned error: %v", err)
 			}
 			if err := w.Flush(); err != nil {

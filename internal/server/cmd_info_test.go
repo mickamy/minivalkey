@@ -10,6 +10,7 @@ import (
 	"github.com/mickamy/minivalkey/internal/clock"
 	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
+	"github.com/mickamy/minivalkey/internal/session"
 )
 
 func TestServer_cmdInfo(t *testing.T) {
@@ -29,9 +30,9 @@ func TestServer_cmdInfo(t *testing.T) {
 			args: resp.Args{
 				[]byte("info"),
 			},
-			wantFn: func(st *db.DB, srv *Server) string {
+			wantFn: func(db *db.DB, srv *Server) string {
 				now := srv.Now()
-				txt, _ := buildInfo("default", now, st, srv.uptimeSeconds(now))
+				txt, _ := buildInfo("default", now, db, srv.uptimeSeconds(now))
 				return fmt.Sprintf("$%d\r\n%s\r\n", len(txt), txt)
 			},
 		},
@@ -41,13 +42,13 @@ func TestServer_cmdInfo(t *testing.T) {
 				[]byte("info"),
 				[]byte("memory"),
 			},
-			arrange: func(st *db.DB) {
-				st.SetString("foo", "bar", time.Time{})
-				st.SetString("baz", "qux", base.Add(30*time.Second))
+			arrange: func(db *db.DB) {
+				db.SetString("foo", "bar", time.Time{})
+				db.SetString("baz", "qux", base.Add(30*time.Second))
 			},
-			wantFn: func(st *db.DB, srv *Server) string {
+			wantFn: func(db *db.DB, srv *Server) string {
 				now := srv.Now()
-				txt, _ := buildInfo("memory", now, st, srv.uptimeSeconds(now))
+				txt, _ := buildInfo("memory", now, db, srv.uptimeSeconds(now))
 				return fmt.Sprintf("$%d\r\n%s\r\n", len(txt), txt)
 			},
 		},
@@ -66,19 +67,20 @@ func TestServer_cmdInfo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := db.New()
+			d := db.New()
 			if tc.arrange != nil {
-				tc.arrange(st)
+				tc.arrange(d)
 			}
 			srv := &Server{
-				db:    st,
+				dbMap: map[int]*db.DB{0: d},
 				clock: clock.New(base),
 			}
 
 			buf := new(bytes.Buffer)
 			w := resp.NewWriter(bufio.NewWriter(buf))
+			req := newRequest(session.New(), "INFO", tc.args)
 
-			if err := srv.cmdInfo("INFO", tc.args, w); err != nil {
+			if err := srv.cmdInfo(w, req); err != nil {
 				t.Fatalf("cmdInfo returned error: %v", err)
 			}
 			if err := w.Flush(); err != nil {
@@ -87,7 +89,7 @@ func TestServer_cmdInfo(t *testing.T) {
 
 			want := tc.want
 			if tc.wantFn != nil {
-				want = tc.wantFn(st, srv)
+				want = tc.wantFn(d, srv)
 			}
 			if got := buf.String(); got != want {
 				t.Fatalf("unexpected payload:\nwant %q\ngot  %q", want, got)

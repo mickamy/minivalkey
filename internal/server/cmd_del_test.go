@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickamy/minivalkey/internal/clock"
 	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
+	"github.com/mickamy/minivalkey/internal/session"
 )
 
 func TestServer_cmdDel(t *testing.T) {
@@ -27,15 +29,15 @@ func TestServer_cmdDel(t *testing.T) {
 				[]byte("foo"),
 				[]byte("bar"),
 			},
-			arrange: func(st *db.DB) {
-				st.SetString("foo", "1", time.Time{})
-				st.SetString("bar", "2", time.Time{})
+			arrange: func(db *db.DB) {
+				db.SetString("foo", "1", time.Time{})
+				db.SetString("bar", "2", time.Time{})
 			},
-			assert: func(t *testing.T, st *db.DB) {
-				if _, ok := st.GetString(time.Time{}, "foo"); ok {
+			assert: func(t *testing.T, db *db.DB) {
+				if _, ok := db.GetString(time.Time{}, "foo"); ok {
 					t.Fatalf("foo was not deleted")
 				}
-				if _, ok := st.GetString(time.Time{}, "bar"); ok {
+				if _, ok := db.GetString(time.Time{}, "bar"); ok {
 					t.Fatalf("bar was not deleted")
 				}
 			},
@@ -63,16 +65,20 @@ func TestServer_cmdDel(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := db.New()
+			d := db.New()
 			if tc.arrange != nil {
-				tc.arrange(st)
+				tc.arrange(d)
 			}
-			srv := &Server{db: st}
+			srv := &Server{
+				dbMap: map[int]*db.DB{0: d},
+				clock: clock.New(time.Time{}),
+			}
 
 			buf := new(bytes.Buffer)
 			w := resp.NewWriter(bufio.NewWriter(buf))
+			req := newRequest(session.New(), "DEL", tc.args)
 
-			if err := srv.cmdDel("DEL", tc.args, w); err != nil {
+			if err := srv.cmdDel(w, req); err != nil {
 				t.Fatalf("cmdDel returned error: %v", err)
 			}
 			if err := w.Flush(); err != nil {
@@ -82,7 +88,7 @@ func TestServer_cmdDel(t *testing.T) {
 				t.Fatalf("unexpected payload:\nwant %q\ngot  %q", tc.want, got)
 			}
 			if tc.assert != nil {
-				tc.assert(t, st)
+				tc.assert(t, d)
 			}
 		})
 	}

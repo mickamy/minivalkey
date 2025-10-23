@@ -6,16 +6,16 @@ import (
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
-func (s *Server) cmdSet(cmd resp.Command, args resp.Args, w *resp.Writer) error {
-	if err := s.validateCommand(cmd, args, validateArgCountAtLeast(3)); err != nil {
+func (s *Server) cmdSet(w *resp.Writer, r *request) error {
+	if err := validateCommand(r.cmd, r.args, validateArgCountAtLeast(3)); err != nil {
 		return w.WriteErrorAndFlush(err)
 	}
 
-	key := string(args[1])
-	val := string(args[2])
+	key := string(r.args[1])
+	val := string(r.args[2])
 
 	// MVP: ignore EX/PX/NX/XX/KEEPTTL options for now.
-	s.db.SetString(key, val, time.Time{})
+	s.db(r.session).SetString(key, val, time.Time{})
 	if err := w.WriteString("OK"); err != nil {
 		return err
 	}

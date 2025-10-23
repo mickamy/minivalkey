@@ -3,6 +3,8 @@
 	fmt \
 	lint \
 	test \
+	test-e2e \
+	test-all \
 	ci \
 	help
 
@@ -19,9 +21,14 @@ lint: ## Run linters (vet and staticcheck)
 	go tool staticcheck ./...
 	cd e2e && go vet ./...
 
-test: ## Run tests locally on the host machine
+test: ## Run unit tests
 	go test ./...
+
+test-e2e: ## Run end-to-end tests
 	cd e2e && go test ./...
+
+test-all: test test-e2e ## Run all tests: unit and end-to-end
+	@echo "All tests passed."
 
 ci: fmt lint test ## Run all CI checks: format, lint, and test
 	@echo "All CI checks passed."

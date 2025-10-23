@@ -9,6 +9,7 @@ import (
 	"github.com/mickamy/minivalkey/internal/clock"
 	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
+	"github.com/mickamy/minivalkey/internal/session"
 )
 
 func TestServer_cmdTTL(t *testing.T) {
@@ -28,8 +29,8 @@ func TestServer_cmdTTL(t *testing.T) {
 				[]byte("ttl"),
 				[]byte("foo"),
 			},
-			arrange: func(st *db.DB) {
-				st.SetString("foo", "bar", base.Add(5*time.Second))
+			arrange: func(db *db.DB) {
+				db.SetString("foo", "bar", base.Add(5*time.Second))
 			},
 			want: ":5\r\n",
 		},
@@ -39,8 +40,8 @@ func TestServer_cmdTTL(t *testing.T) {
 				[]byte("ttl"),
 				[]byte("foo"),
 			},
-			arrange: func(st *db.DB) {
-				st.SetString("foo", "bar", time.Time{})
+			arrange: func(db *db.DB) {
+				db.SetString("foo", "bar", time.Time{})
 			},
 			want: ":-1\r\n",
 		},
@@ -66,19 +67,20 @@ func TestServer_cmdTTL(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := db.New()
+			d := db.New()
 			if tc.arrange != nil {
-				tc.arrange(st)
+				tc.arrange(d)
 			}
 			srv := &Server{
-				db:    st,
+				dbMap: map[int]*db.DB{0: d},
 				clock: clock.New(base),
 			}
 
 			buf := new(bytes.Buffer)
 			w := resp.NewWriter(bufio.NewWriter(buf))
+			req := newRequest(session.New(), "TTL", tc.args)
 
-			if err := srv.cmdTTL("TTL", tc.args, w); err != nil {
+			if err := srv.cmdTTL(w, req); err != nil {
 				t.Fatalf("cmdTTL returned error: %v", err)
 			}
 			if err := w.Flush(); err != nil {
