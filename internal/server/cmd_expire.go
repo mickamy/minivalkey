@@ -1,8 +1,6 @@
 package server
 
 import (
-	"errors"
-
 	"github.com/mickamy/minivalkey/internal/resp"
 )
 
@@ -11,7 +9,7 @@ func (s *Server) cmdExpire(cmd resp.Command, args resp.Args, w *resp.Writer) err
 		return w.WriteErrorAndFlush(err)
 	}
 	key := string(args[1])
-	sec, ok := parseInt(args[2])
+	sec, ok := resp.ParseInt(args[2])
 	if !ok {
 		return w.WriteErrorAndFlush(ErrValueNotInteger)
 	}
