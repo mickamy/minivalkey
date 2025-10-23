@@ -75,6 +75,25 @@ func (st *Store) Del(keys ...string) int {
 	return n
 }
 
+// Exists returns count of keys that exist and are not expired at "now".
+func (st *Store) Exists(now time.Time, keys ...string) int {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	n := 0
+	for _, k := range keys {
+		e, ok := st.data[k]
+		if !ok {
+			continue
+		}
+		if !e.expireAt.IsZero() && now.After(e.expireAt) {
+			delete(st.data, k)
+			continue
+		}
+		n++
+	}
+	return n
+}
+
 // Expire sets a TTL in seconds for a key.
 // sec < 0 removes expiration (persist).
 // Returns false if key does not exist.
