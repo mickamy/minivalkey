@@ -53,8 +53,9 @@ func TestServer_cmdPing(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
+			d := db.New()
 			srv := &Server{
-				dbMap: make(map[int]*db.DB),
+				dbMap: map[int]*db.DB{0: d},
 				clock: clock.New(now),
 			}
 

@@ -33,20 +33,20 @@ func (s *Server) cmdInfo(w *resp.Writer, r *request) error {
 
 // buildInfo builds an INFO string for a given section.
 // Returns (text, true) if section is supported; ("", false) otherwise.
-func buildInfo(section string, now time.Time, st *db.DB, uptimeSec int64) (string, bool) {
+func buildInfo(section string, now time.Time, db *db.DB, uptimeSec int64) (string, bool) {
 	switch section {
 	case "all", "default":
 		var b strings.Builder
 		b.WriteString(infoServer(now, uptimeSec))
-		b.WriteString(infoMemory(now, st))
-		b.WriteString(infoKeyspace(now, st))
+		b.WriteString(infoMemory(now, db))
+		b.WriteString(infoKeyspace(now, db))
 		return b.String(), true
 	case "server":
 		return infoServer(now, uptimeSec), true
 	case "memory":
-		return infoMemory(now, st), true
+		return infoMemory(now, db), true
 	case "keyspace":
-		return infoKeyspace(now, st), true
+		return infoKeyspace(now, db), true
 	case "replication":
 		return infoReplication(), true
 	default:
@@ -80,8 +80,8 @@ func infoServer(now time.Time, uptimeSec int64) string {
 	return b.String()
 }
 
-func infoMemory(now time.Time, st *db.DB) string {
-	keys, expires, _ := st.Stats(now)
+func infoMemory(now time.Time, db *db.DB) string {
+	keys, expires, _ := db.Stats(now)
 	var b strings.Builder
 	b.WriteString("# Memory\r\n")
 	// used_memory: we don't track bytes; expose number of keys as a hint
@@ -95,8 +95,8 @@ func infoMemory(now time.Time, st *db.DB) string {
 	return b.String()
 }
 
-func infoKeyspace(now time.Time, st *db.DB) string {
-	keys, expires, avgTTLms := st.Stats(now)
+func infoKeyspace(now time.Time, db *db.DB) string {
+	keys, expires, avgTTLms := db.Stats(now)
 	var b strings.Builder
 	b.WriteString("# Keyspace\r\n")
 	// Only emit db0 if there are any keys (mimic Redis behavior)

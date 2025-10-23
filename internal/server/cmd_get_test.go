@@ -29,8 +29,8 @@ func TestServer_cmdGet(t *testing.T) {
 				[]byte("get"),
 				[]byte("foo"),
 			},
-			arrange: func(st *db.DB) {
-				st.SetString("foo", "bar", time.Time{})
+			arrange: func(db *db.DB) {
+				db.SetString("foo", "bar", time.Time{})
 			},
 			want: "$3\r\nbar\r\n",
 		},
@@ -56,12 +56,12 @@ func TestServer_cmdGet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := db.New()
+			d := db.New()
 			if tc.arrange != nil {
-				tc.arrange(st)
+				tc.arrange(d)
 			}
 			srv := &Server{
-				dbMap: make(map[int]*db.DB),
+				dbMap: map[int]*db.DB{0: d},
 				clock: clock.New(now),
 			}
 

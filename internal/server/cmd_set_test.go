@@ -31,8 +31,8 @@ func TestServer_cmdSet(t *testing.T) {
 				[]byte("foo"),
 				[]byte("bar"),
 			},
-			assert: func(t *testing.T, st *db.DB) {
-				got, ok := st.GetString(time.Time{}, "foo")
+			assert: func(t *testing.T, db *db.DB) {
+				got, ok := db.GetString(time.Time{}, "foo")
 				if !ok {
 					t.Fatalf("foo missing from db")
 				}
@@ -57,12 +57,12 @@ func TestServer_cmdSet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := db.New()
+			d := db.New()
 			if tc.arrange != nil {
-				tc.arrange(st)
+				tc.arrange(d)
 			}
 			srv := &Server{
-				dbMap: make(map[int]*db.DB),
+				dbMap: map[int]*db.DB{0: d},
 				clock: clock.New(now),
 			}
 
@@ -80,7 +80,7 @@ func TestServer_cmdSet(t *testing.T) {
 				t.Fatalf("unexpected payload:\nwant %q\ngot  %q", tc.want, got)
 			}
 			if tc.assert != nil {
-				tc.assert(t, st)
+				tc.assert(t, d)
 			}
 		})
 	}

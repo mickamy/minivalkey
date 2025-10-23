@@ -31,9 +31,9 @@ func TestServer_cmdExists(t *testing.T) {
 				[]byte("bar"),
 				[]byte("baz"),
 			},
-			arrange: func(st *db.DB, now time.Time) {
-				st.SetString("foo", "1", time.Time{})
-				st.SetString("bar", "2", time.Time{})
+			arrange: func(db *db.DB, now time.Time) {
+				db.SetString("foo", "1", time.Time{})
+				db.SetString("bar", "2", time.Time{})
 			},
 			want: ":2\r\n",
 		},
@@ -44,9 +44,9 @@ func TestServer_cmdExists(t *testing.T) {
 				[]byte("fresh"),
 				[]byte("stale"),
 			},
-			arrange: func(st *db.DB, now time.Time) {
-				st.SetString("fresh", "1", time.Time{})
-				st.SetString("stale", "2", now.Add(-time.Second))
+			arrange: func(db *db.DB, now time.Time) {
+				db.SetString("fresh", "1", time.Time{})
+				db.SetString("stale", "2", now.Add(-time.Second))
 			},
 			want: ":1\r\n",
 		},
@@ -64,12 +64,12 @@ func TestServer_cmdExists(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := db.New()
+			d := db.New()
 			if tc.arrange != nil {
-				tc.arrange(st, base)
+				tc.arrange(d, base)
 			}
 			srv := &Server{
-				dbMap: make(map[int]*db.DB),
+				dbMap: map[int]*db.DB{0: d},
 				clock: clock.New(base),
 			}
 
