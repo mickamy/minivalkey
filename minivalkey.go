@@ -4,26 +4,19 @@ import (
 	"net"
 	"time"
 
-	"github.com/mickamy/minivalkey/internal/clock"
 	"github.com/mickamy/minivalkey/internal/server"
-	"github.com/mickamy/minivalkey/internal/store"
 )
 
 // MiniValkey represents an in-memory Valkey-compatible server instance.
 // It provides APIs for starting, stopping, and manipulating simulated time.
 type MiniValkey struct {
-	addr  string
-	srv   *server.Server
-	store *store.Store
+	addr string
+	srv  *server.Server
 }
 
 // Run starts a new in-memory Valkey server listening on an ephemeral port.
 func Run() (*MiniValkey, error) {
-	st := store.New()
-	s := &MiniValkey{
-		store: st,
-	}
-	clk := clock.New(time.Now())
+	s := &MiniValkey{}
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -32,7 +25,7 @@ func Run() (*MiniValkey, error) {
 	s.addr = ln.Addr().String()
 
 	// Start TCP server
-	s.srv, err = server.New(ln, st, clk)
+	s.srv, err = server.New(ln)
 	if err != nil {
 		_ = ln.Close()
 		return nil, err
@@ -49,7 +42,7 @@ func Run() (*MiniValkey, error) {
 			case <-s.srv.Done():
 				return
 			case <-ticker.C:
-				st.CleanUpExpired(s.srv.Now())
+				s.srv.CleanUpExpired(s.srv.Now())
 			}
 		}
 	}()
@@ -81,9 +74,6 @@ func (s *MiniValkey) Close() error {
 }
 
 // FastForward advances the internal clock by the specified duration.
-// Useful for testing key expiration.
 func (s *MiniValkey) FastForward(d time.Duration) {
-	// Advance simulated clock inside the server, then run clean-up outside the lock.
-	now := s.srv.AdvanceClock(d)
-	s.store.CleanUpExpired(now)
+	s.srv.FastForward(d)
 }

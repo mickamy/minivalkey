@@ -28,21 +28,15 @@ type Server struct {
 }
 
 // New wires a Store to a net.Listener and seeds the simulated clock.
-func New(ln net.Listener, st *store.Store, clk *clock.Clock) (*Server, error) {
+func New(ln net.Listener) (*Server, error) {
 	if ln == nil {
 		return nil, errors.New("listener is nil")
-	}
-	if st == nil {
-		return nil, errors.New("store is nil")
-	}
-	if clk == nil {
-		return nil, errors.New("clock is nil")
 	}
 	s := &Server{
 		listener: ln,
 		doneCh:   make(chan struct{}),
-		store:    st,
-		clock:    clk,
+		store:    store.New(),
+		clock:    clock.New(time.Now()),
 		cmds:     make(map[string]handleFunc),
 	}
 
@@ -150,9 +144,15 @@ func (s *Server) Now() time.Time {
 	return s.clock.Now()
 }
 
-// AdvanceClock moves the simulated clock forward and returns the updated time.
-func (s *Server) AdvanceClock(d time.Duration) time.Time {
-	return s.clock.Advance(d)
+// FastForward advances the internal clock by the specified duration.
+func (s *Server) FastForward(d time.Duration) {
+	now := s.clock.Advance(d)
+	s.CleanUpExpired(now)
+}
+
+// CleanUpExpired removes expired keys based on the current simulated time.
+func (s *Server) CleanUpExpired(now time.Time) {
+	s.store.CleanUpExpired(now)
 }
 
 func parseInt(b []byte) (int64, bool) {
