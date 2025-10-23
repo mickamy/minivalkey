@@ -52,6 +52,7 @@ func New(ln net.Listener, st *store.Store, clk *clock.Clock) (*Server, error) {
 
 	handlers := map[string]handleFunc{
 		"DEL":    s.cmdDel,
+		"EXISTS": s.cmdExists,
 		"EXPIRE": s.cmdExpire,
 		"GET":    s.cmdGet,
 		"HELLO":  s.cmdHello,

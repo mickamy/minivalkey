@@ -12,7 +12,7 @@ import (
 )
 
 // E2E tests using valkey-go client.
-// Verifies PING, SET, GET, DEL, EXPIRE, TTL and simulated time.
+// Verifies PING, SET, GET, EXISTS, DEL, EXPIRE, TTL and simulated time.
 func TestBasicCommandsAndTTL_WithValkeyGo(t *testing.T) {
 	// Boot in-memory server
 	s, err := minivalkey.Run()
@@ -27,65 +27,96 @@ func TestBasicCommandsAndTTL_WithValkeyGo(t *testing.T) {
 	ctx := t.Context()
 
 	// --- PING (no payload) ---
-	resp := client.Do(ctx, client.B().Ping().Build())
-	require.NoError(t, resp.Error())
-	str, err := resp.ToString()
-	require.NoError(t, err)
-	assert.Equal(t, "PONG", str)
+	{
+		resp := client.Do(ctx, client.B().Ping().Build())
+		require.NoError(t, resp.Error())
+		str, err := resp.ToString()
+		require.NoError(t, err)
+		assert.Equal(t, "PONG", str)
+	}
 
 	// --- PING (with payload) ---
-	resp = client.Do(ctx, client.B().Ping().Message("hello").Build())
-	require.NoError(t, resp.Error())
-	str, err = resp.ToString()
-	require.NoError(t, err)
-	assert.Equal(t, "hello", str)
+	{
+		resp := client.Do(ctx, client.B().Ping().Message("hello").Build())
+		require.NoError(t, resp.Error())
+		str, err := resp.ToString()
+		require.NoError(t, err)
+		assert.Equal(t, "hello", str)
+	}
 
 	// --- SET / GET ---
-	require.NoError(t, client.Do(ctx, client.B().Set().Key("k").Value("v").Build()).Error())
-	got := client.Do(ctx, client.B().Get().Key("k").Build())
-	require.NoError(t, got.Error())
-	sv, err := got.ToString()
-	require.NoError(t, err)
-	assert.Equal(t, "v", sv)
+	{
+		require.NoError(t, client.Do(ctx, client.B().Set().Key("k").Value("v").Build()).Error())
+		got := client.Do(ctx, client.B().Get().Key("k").Build())
+		require.NoError(t, got.Error())
+		str, err := got.ToString()
+		require.NoError(t, err)
+		assert.Equal(t, "v", str)
+	}
+
+	// --- EXISTS ---
+	{
+		exists := client.Do(ctx, client.B().Exists().Key("k").Build())
+		require.NoError(t, exists.Error())
+		existsInt, err := exists.AsInt64()
+		require.NoError(t, err)
+		assert.EqualValues(t, 1, existsInt)
+
+		nonexist := client.Do(ctx, client.B().Exists().Key("nope").Build())
+		require.NoError(t, nonexist.Error())
+		nonexistInt, err := nonexist.AsInt64()
+		require.NoError(t, err)
+		assert.EqualValues(t, 0, nonexistInt)
+	}
 
 	// --- DEL ---
-	del := client.Do(ctx, client.B().Del().Key("k").Build())
-	require.NoError(t, del.Error())
-	n, err := del.AsInt64()
-	require.NoError(t, err)
-	assert.EqualValues(t, 1, n)
+	{
+		del := client.Do(ctx, client.B().Del().Key("k").Build())
+		require.NoError(t, del.Error())
+		i, err := del.AsInt64()
+		require.NoError(t, err)
+		assert.EqualValues(t, 1, i)
+	}
 
 	// Deleted key should be absent
-	gone := client.Do(ctx, client.B().Get().Key("k").Build())
-	require.True(t, valkey.IsValkeyNil(gone.Error()))
-	_, err = gone.ToString()
-	assert.Error(t, err, "expect conversion error for nil bulk")
+	{
+		gone := client.Do(ctx, client.B().Get().Key("k").Build())
+		require.True(t, valkey.IsValkeyNil(gone.Error()))
+		_, err = gone.ToString()
+		assert.Error(t, err, "expect conversion error for nil bulk")
+	}
 
 	// --- EXPIRE / TTL ---
-	require.NoError(t, client.Do(ctx, client.B().Set().Key("ttl").Value("x").Build()).Error())
-	require.NoError(t, client.Do(ctx, client.B().Expire().Key("ttl").Seconds(5).Build()).Error())
+	{
+		require.NoError(t, client.Do(ctx, client.B().Set().Key("ttl").Value("x").Build()).Error())
+		require.NoError(t, client.Do(ctx, client.B().Expire().Key("ttl").Seconds(5).Build()).Error())
 
-	ttl := client.Do(ctx, client.B().Ttl().Key("ttl").Build())
-	require.NoError(t, ttl.Error())
-	dur, err := ttl.AsInt64()
-	require.NoError(t, err)
-	assert.Greater(t, dur, int64(0), "TTL should be positive")
+		ttl := client.Do(ctx, client.B().Ttl().Key("ttl").Build())
+		require.NoError(t, ttl.Error())
+		dur, err := ttl.AsInt64()
+		require.NoError(t, err)
+		assert.Greater(t, dur, int64(0), "TTL should be positive")
+	}
 
 	// Fast-forward virtual time to expire
-	s.FastForward(6 * time.Second)
+	{
+		s.FastForward(6 * time.Second)
 
-	// Key should be expired
-	exp := client.Do(ctx, client.B().Get().Key("ttl").Build())
-	require.True(t, valkey.IsValkeyNil(exp.Error()))
-	_, err = exp.ToString()
-	assert.Error(t, err, "expired key should be nil bulk")
+		// Key should be expired
+		exp := client.Do(ctx, client.B().Get().Key("ttl").Build())
+		require.True(t, valkey.IsValkeyNil(exp.Error()))
+		_, err = exp.ToString()
+		assert.Error(t, err, "expired key should be nil bulk")
+	}
 
 	// TTL should be -2 (no such key)
-	ttl2 := client.Do(ctx, client.B().Ttl().Key("ttl").Build())
-	require.NoError(t, ttl2.Error())
-	dur2, err := ttl2.AsInt64()
-	require.NoError(t, err)
-	assert.Equal(t, int64(-2), dur2)
+	{
+		ttl2 := client.Do(ctx, client.B().Ttl().Key("ttl").Build())
+		require.NoError(t, ttl2.Error())
+		dur, err := ttl2.AsInt64()
+		require.NoError(t, err)
+		assert.Equal(t, int64(-2), dur)
+	}
 }
 
 func TestTTL_NoExpire_And_NonExisting_WithValkeyGo(t *testing.T) {
@@ -100,19 +131,23 @@ func TestTTL_NoExpire_And_NonExisting_WithValkeyGo(t *testing.T) {
 	ctx := t.Context()
 
 	// TTL on non-existing key -> -2
-	ttl := client.Do(ctx, client.B().Ttl().Key("nope").Build())
-	require.NoError(t, ttl.Error())
-	n, err := ttl.AsInt64()
-	require.NoError(t, err)
-	assert.Equal(t, int64(-2), n)
+	{
+		ttl := client.Do(ctx, client.B().Ttl().Key("nope").Build())
+		require.NoError(t, ttl.Error())
+		n, err := ttl.AsInt64()
+		require.NoError(t, err)
+		assert.Equal(t, int64(-2), n)
+	}
 
 	// Key without expire -> TTL = -1
-	require.NoError(t, client.Do(ctx, client.B().Set().Key("plain").Value("v").Build()).Error())
-	ttl = client.Do(ctx, client.B().Ttl().Key("plain").Build())
-	require.NoError(t, ttl.Error())
-	n, err = ttl.AsInt64()
-	require.NoError(t, err)
-	assert.Equal(t, int64(-1), n)
+	{
+		require.NoError(t, client.Do(ctx, client.B().Set().Key("plain").Value("v").Build()).Error())
+		ttl := client.Do(ctx, client.B().Ttl().Key("plain").Build())
+		require.NoError(t, ttl.Error())
+		n, err := ttl.AsInt64()
+		require.NoError(t, err)
+		assert.Equal(t, int64(-1), n)
+	}
 }
 
 func newValkeyClient(t *testing.T, s *minivalkey.MiniValkey) valkey.Client {
