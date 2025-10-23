@@ -39,7 +39,10 @@ func New(ln net.Listener) (*Server, error) {
 		doneCh:   make(chan struct{}),
 		dbMap:    make(map[int]*db.DB),
 		cleanUpBufPool: sync.Pool{
-			New: func() any { return make([]*db.DB, 0, 8) },
+			New: func() any {
+				buf := make([]*db.DB, 0, 8)
+				return &buf
+			},
 		},
 		clock:    clock.New(time.Now()),
 		handlers: make(map[string]handleFunc),
@@ -160,11 +163,8 @@ func (s *Server) FastForward(d time.Duration) {
 
 // CleanUpExpired removes expired keys based on the current simulated time.
 func (s *Server) CleanUpExpired(now time.Time) {
-	bufAny := s.cleanUpBufPool.Get()
-	var dbs []*db.DB
-	if bufAny != nil {
-		dbs = bufAny.([]*db.DB)
-	}
+	bufPtr := s.cleanUpBufPool.Get().(*[]*db.DB)
+	dbs := *bufPtr
 	s.dbMu.RLock()
 	n := len(s.dbMap)
 	if cap(dbs) < n {
@@ -184,7 +184,8 @@ func (s *Server) CleanUpExpired(now time.Time) {
 	for i := range dbs {
 		dbs[i] = nil
 	}
-	s.cleanUpBufPool.Put(dbs[:0])
+	*bufPtr = dbs[:0]
+	s.cleanUpBufPool.Put(bufPtr)
 }
 
 // db returns the DB instance for the selected database in the session.
