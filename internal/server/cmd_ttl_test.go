@@ -72,6 +72,7 @@ func TestServer_cmdTTL(t *testing.T) {
 				tc.arrange(st)
 			}
 			srv := &Server{
+				dbMap: make(map[int]*db.DB),
 				clock: clock.New(base),
 			}
 

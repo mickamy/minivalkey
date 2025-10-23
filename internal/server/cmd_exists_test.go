@@ -69,6 +69,7 @@ func TestServer_cmdExists(t *testing.T) {
 				tc.arrange(st, base)
 			}
 			srv := &Server{
+				dbMap: make(map[int]*db.DB),
 				clock: clock.New(base),
 			}
 

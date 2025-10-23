@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mickamy/minivalkey/internal/clock"
+	"github.com/mickamy/minivalkey/internal/db"
 	"github.com/mickamy/minivalkey/internal/resp"
 	"github.com/mickamy/minivalkey/internal/session"
 )
@@ -58,6 +59,7 @@ func TestServer_cmdHello(t *testing.T) {
 			t.Parallel()
 
 			srv := &Server{
+				dbMap: make(map[int]*db.DB),
 				clock: clock.New(now),
 			}
 
