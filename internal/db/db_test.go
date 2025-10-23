@@ -239,19 +239,19 @@ func TestStore_SetStringWithOptions(t *testing.T) {
 		st := New()
 		st.SetString("exists", "v1", time.Time{})
 
-		if ok := st.SetStringWithOptions(now, "exists", "nx", SetOptions{NX: true}); ok {
+		if ok, _, _ := st.SetStringWithOptions(now, "exists", "nx", SetOptions{NX: true}); ok {
 			t.Fatalf("expected NX to fail when key exists")
 		}
 		if got, _ := st.GetString(time.Time{}, "exists"); got != "v1" {
 			t.Fatalf("expected value to remain v1, got %q", got)
 		}
 
-		if ok := st.SetStringWithOptions(now, "missing", "xx", SetOptions{XX: true}); ok {
+		if ok, _, _ := st.SetStringWithOptions(now, "missing", "xx", SetOptions{XX: true}); ok {
 			t.Fatalf("expected XX to fail when key missing")
 		}
 
 		st.SetString("keepttl", "v2", now.Add(10*time.Second))
-		if ok := st.SetStringWithOptions(now, "keepttl", "v3", SetOptions{KeepTTL: true, XX: true}); !ok {
+		if ok, _, _ := st.SetStringWithOptions(now, "keepttl", "v3", SetOptions{KeepTTL: true, XX: true}); !ok {
 			t.Fatalf("expected keepttl set to succeed")
 		}
 		if ttl := st.TTL(now, "keepttl"); ttl != 10 {
@@ -265,7 +265,7 @@ func TestStore_SetStringWithOptions(t *testing.T) {
 		st := New()
 		st.SetString("stale", "old", now.Add(-time.Second))
 
-		if ok := st.SetStringWithOptions(now, "stale", "fresh", SetOptions{NX: true}); !ok {
+		if ok, _, _ := st.SetStringWithOptions(now, "stale", "fresh", SetOptions{NX: true}); !ok {
 			t.Fatalf("expected NX to succeed when existing key is expired")
 		}
 		if got, _ := st.GetString(time.Time{}, "stale"); got != "fresh" {
@@ -278,7 +278,7 @@ func TestStore_SetStringWithOptions(t *testing.T) {
 
 		st := New()
 		exp := now.Add(5 * time.Second)
-		if ok := st.SetStringWithOptions(now, "foo", "bar", SetOptions{
+		if ok, _, _ := st.SetStringWithOptions(now, "foo", "bar", SetOptions{
 			HasExpire: true,
 			ExpireAt:  exp,
 		}); !ok {
@@ -294,8 +294,10 @@ func TestStore_SetStringWithOptions(t *testing.T) {
 
 		st := New()
 		st.SetString("foo", "old", time.Time{})
-		if ok := st.SetStringWithOptions(now, "foo", "new", SetOptions{XX: true}); !ok {
+		if ok, prev, prevExists := st.SetStringWithOptions(now, "foo", "new", SetOptions{XX: true}); !ok {
 			t.Fatalf("expected XX to succeed for existing key")
+		} else if !prevExists || prev != "old" {
+			t.Fatalf("expected prev=old, ok=true; got prev=%q prevExists=%v", prev, prevExists)
 		}
 		if got, _ := st.GetString(time.Time{}, "foo"); got != "new" {
 			t.Fatalf("expected value new, got %q", got)
